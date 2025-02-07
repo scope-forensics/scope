@@ -1,0 +1,98 @@
+{% extends "web/app/app_base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Normalized Logs</h2>
+    
+    <!-- Search and Filter Form -->
+    <form method="get" class="mb-4">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="Search logs..." value="{{ search_query }}">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="field" class="form-control">
+                    <option value="">Filter by field...</option>
+                    <option value="log_level" {% if field_filter == 'log_level' %}selected{% endif %}>Log Level</option>
+                    <option value="source" {% if field_filter == 'source' %}selected{% endif %}>Source</option>
+                    <option value="resource_id" {% if field_filter == 'resource_id' %}selected{% endif %}>Resource ID</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="field_value" class="form-control" placeholder="Field value..." value="{{ field_value }}">
+            </div>
+            <div class="col-md-2">
+                <select name="sort" class="form-control">
+                    <option value="-timestamp" {% if sort_order == '-timestamp' %}selected{% endif %}>Newest First</option>
+                    <option value="timestamp" {% if sort_order == 'timestamp' %}selected{% endif %}>Oldest First</option>
+                </select>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-2">Apply Filters</button>
+    </form>
+
+    <!-- Logs Table -->
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Level</th>
+                    <th>Source</th>
+                    <th>Resource ID</th>
+                    <th>Message</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in object_list %}
+                <tr>
+                    <td>{{ log.timestamp }}</td>
+                    <td><span class="badge {% if log.log_level == 'ERROR' %}bg-danger{% elif log.log_level == 'WARNING' %}bg-warning{% else %}bg-info{% endif %}">
+                        {{ log.log_level }}
+                    </span></td>
+                    <td>{{ log.source }}</td>
+                    <td>{{ log.resource_id }}</td>
+                    <td>{{ log.message }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center">No logs found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">&laquo; First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Previous</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Last &raquo;</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %} 

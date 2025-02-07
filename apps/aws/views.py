@@ -179,7 +179,7 @@ def normalized_logs_view(request, account_id):
         "start_date": start_date,
         "end_date": end_date,
     }
-    return render(request, "aws/normalized_logs.html", context)
+    return render(request, "aws/get_logs.html", context)
 
 @login_required
 def aws_logsource_details(request, slug):
@@ -244,7 +244,7 @@ def fetch_cloudtrail_logs(request, account_id):
                 case_id=resource.case.id
             )
             messages.success(request, "CloudTrail log fetching has been queued.")
-            return redirect("aws:normalized_logs", account_id=aws_account.account_id)
+            return redirect("aws:get_logs", account_id=aws_account.account_id)
     else:
         form = FetchCloudTrailLogsForm()
 
@@ -260,7 +260,7 @@ def trigger_management_event_fetch(request, account_id):
     messages.success(request, "Management event history is being fetched.")
     logger.info(f"Task queued for AWS account {account_id}")
 
-    return redirect("aws:normalized_logs", account_id=aws_account.account_id)
+    return redirect("aws:get_logs", account_id=aws_account.account_id)
 
 @login_required
 def aws_credential_details(request, slug):
