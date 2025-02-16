@@ -1,0 +1,41 @@
+# AWS Pre-built Detection Rules
+
+- name: "GetCallerIdentity Reconnaissance"
+  description: "Detects attempts to enumerate AWS account information using GetCallerIdentity"
+  cloud: "aws"
+  detection_type: "api_call"
+  severity: "medium"
+  event_source: "sts.amazonaws.com"
+  event_name: "GetCallerIdentity"
+  auto_tags: ["suspicious", "reconnaissance"]
+  enabled: true
+
+- name: "Root Account Usage"
+  description: "Detects usage of the root account which is a security best practice violation"
+  cloud: "aws"
+  detection_type: "login"
+  severity: "high"
+  event_source: "signin.amazonaws.com"
+  additional_criteria: {"user_identity": "root"}
+  auto_tags: ["high-risk", "compliance-violation"]
+  enabled: true
+
+- name: "Security Group Modification"
+  description: "Detects modifications to security groups which could indicate network security changes"
+  cloud: "aws"
+  detection_type: "network"
+  severity: "medium"
+  event_source: "ec2.amazonaws.com"
+  event_name: "AuthorizeSecurityGroupIngress"
+  auto_tags: ["security-group-change", "network-modification"]
+  enabled: true
+
+- name: "IAM Policy Changes"
+  description: "Detects changes to IAM policies which could indicate privilege escalation attempts"
+  cloud: "aws"
+  detection_type: "iam"
+  severity: "high"
+  event_source: "iam.amazonaws.com"
+  event_name: "PutRolePolicy"
+  auto_tags: ["iam-change", "privilege-escalation"]
+  enabled: true

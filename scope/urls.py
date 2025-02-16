@@ -39,6 +39,7 @@ urlpatterns = [
     path("case/", include("apps.case.urls")),
     path("aws/", include("apps.aws.urls")),
     path("data/", include("apps.data.urls")),
+    path("analysis/", include("apps.analysis.urls")),
     path("celery-progress/", include("celery_progress.urls")),
     # API docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

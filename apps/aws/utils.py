@@ -65,27 +65,28 @@ def pull_aws_resources(aws_account):
         try:
             iam = session.client('iam')
             
-            # Generate credential report - this may take a few seconds
+            # Generate credential report
             response = iam.generate_credential_report()
             
-            # Wait for report to be generated
-            state = response.get('State', '')
-            while state != 'COMPLETE':
-                logger.info(f"Waiting for credential report to be generated... Current state: {state}")
-                time.sleep(2)
+            # Wait for report to be generated with timeout
+            max_attempts = 10  # Maximum number of attempts
+            attempt = 0
+            while attempt < max_attempts:
                 try:
                     response = iam.get_credential_report()
-                    state = response.get('State', '')
+                    if response.get('Content'):
+                        break
                 except iam.exceptions.CredentialReportNotPresentException:
-                    logger.info("Report not ready yet, retrying...")
+                    logger.info(f"Report not ready yet, attempt {attempt + 1}/{max_attempts}")
+                    time.sleep(2)
+                    attempt += 1
                     continue
             
-            # Get the credential report
-            response = iam.get_credential_report()
-            if 'Content' not in response:
-                logger.error("No content in credential report response")
+            if attempt >= max_attempts:
+                logger.error("Timed out waiting for credential report")
                 return
             
+            # Get and process the credential report
             report_csv = response['Content'].decode('utf-8')
             
             # Parse CSV content
@@ -524,47 +525,71 @@ def fetch_and_normalize_cloudtrail_logs(account_id, resource_id, prefix, start_d
         prefix += "/"
 
     current_date = start_date_obj
-    with transaction.atomic():
-        while current_date <= end_date_obj:
-            date_folder = f"{current_date.year}/{current_date.strftime('%m')}/{current_date.strftime('%d')}/"
-            final_prefix = prefix + date_folder
+    while current_date <= end_date_obj:
+        date_folder = f"{current_date.year}/{current_date.strftime('%m')}/{current_date.strftime('%d')}/"
+        final_prefix = prefix + date_folder if prefix else date_folder
 
-            logger.info(f"Checking prefix '{final_prefix}' in bucket '{bucket_name}'")
+        logger.info(f"Checking prefix '{final_prefix}' in bucket '{bucket_name}'")
 
-            try:
-                paginator = s3.get_paginator("list_objects_v2")
-                for page in paginator.paginate(Bucket=bucket_name, Prefix=final_prefix):
-                    for obj in page.get("Contents", []):
-                        key = obj["Key"]
-                        try:
-                            resp = s3.get_object(Bucket=bucket_name, Key=key)
-                            raw_body = resp["Body"].read()
+        try:
+            paginator = s3.get_paginator("list_objects_v2")
+            for page in paginator.paginate(Bucket=bucket_name, Prefix=final_prefix):
+                for obj in page.get("Contents", []):
+                    key = obj["Key"]
+                    try:
+                        resp = s3.get_object(Bucket=bucket_name, Key=key)
+                        raw_body = resp["Body"].read()
+                        
+                        # Decompress if gzipped
+                        if key.endswith(".gz"):
+                            file_data = gzip.decompress(raw_body).decode("utf-8")
+                        else:
+                            file_data = raw_body.decode("utf-8")
+
+                        json_data = json.loads(file_data)
+                        records = json_data.get("Records", [])
+                        
+                        # Process records in smaller batches
+                        batch_size = 100
+                        for i in range(0, len(records), batch_size):
+                            batch_records = records[i:i + batch_size]
+                            normalized_logs = []
                             
-                            # Decompress if gzipped
-                            if key.endswith(".gz"):
-                                file_data = gzip.decompress(raw_body).decode("utf-8")
-                            else:
-                                file_data = raw_body.decode("utf-8")
-
-                            records = json.loads(file_data).get("Records", [])
-                            
-                            # Process each record
-                            for record in records:
+                            # Prepare batch of normalized logs
+                            for record in batch_records:
                                 try:
                                     normalized_data = normalize_cloudtrail_event(record, case, aws_account)
-                                    NormalizedLog.objects.create(**normalized_data)
+                                    if normalized_data:
+                                        normalized_logs.append(NormalizedLog(**normalized_data))
                                 except Exception as e:
-                                    logger.error(f"Error processing record: {e}")
+                                    logger.error(f"Error normalizing record: {e}")
                                     continue
+                            
+                            # Bulk create the batch in a transaction
+                            if normalized_logs:
+                                try:
+                                    with transaction.atomic():
+                                        NormalizedLog.objects.bulk_create(normalized_logs, batch_size=batch_size)
+                                except Exception as e:
+                                    logger.error(f"Error bulk creating logs: {e}")
+                                    # If bulk create fails, try individual creates
+                                    for log in normalized_logs:
+                                        try:
+                                            with transaction.atomic():
+                                                log.save()
+                                        except Exception as individual_error:
+                                            logger.error(f"Error saving individual log: {individual_error}")
 
-                        except Exception as e:
-                            logger.error(f"Error processing file {key}: {e}")
-                            continue
+                    except Exception as e:
+                        logger.error(f"Error processing file {key}: {e}")
+                        continue
 
-            except Exception as e:
-                logger.error(f"Error processing date {current_date}: {e}")
+        except Exception as e:
+            logger.error(f"Error processing date {current_date}: {e}")
 
-            current_date += timedelta(days=1)
+        current_date += timedelta(days=1)
+
+    logger.info("Completed processing CloudTrail logs")
 
 def fetch_management_event_history(account_id, case_id):
     """Fetch and normalize CloudTrail management events using LookupEvents API"""

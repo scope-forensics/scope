@@ -1,0 +1,38 @@
+{% extends 'web/app/app_base.html' %}
+
+{% block app %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a href="{% url 'web:home' %}" class="text-primary text-decoration-underline">Dashboard</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'case:case_detail' case.slug %}" class="text-primary text-decoration-underline">{{ case.name }}</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'analysis:case_detections' case.id %}" class="text-primary text-decoration-underline">Detections</a>
+            </li>
+            <li class="breadcrumb-item">
+                <a href="{% url 'analysis:detection_list' case.id %}" class="text-primary text-decoration-underline">Manage Rules</a>
+            </li>
+            <li class="breadcrumb-item active">Delete Detection</li>
+        </ol>
+    </nav>
+
+    <h2>Delete Detection</h2>
+    <p class="text-muted">Case: {{ case.name }}</p>
+    
+    <div class="alert alert-danger">
+        Are you sure you want to delete the detection rule "{{ detection.name }}"?
+        This action cannot be undone.
+    </div>
+    
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Delete</button>
+        <a href="{% url 'analysis:detection_list' case.id %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %} 

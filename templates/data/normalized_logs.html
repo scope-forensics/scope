@@ -1,98 +1,253 @@
 {% extends "web/app/app_base.html" %}
 {% load static %}
 
-{% block content %}
-<div class="container mt-4">
-    <h2>Normalized Logs</h2>
-    
-    <!-- Search and Filter Form -->
-    <form method="get" class="mb-4">
-        <div class="row">
+{% block app %}
+<section class="app-section py-4">
+  <div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Log Explorer</h1>
+      </div>
+      <a href="" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Account
+      </a>
+    </div>
+
+    <!-- Search and Filter Card -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Search & Filters</h2>
+      </div>
+      <div class="card-body">
+        <form method="get">
+          <div class="row g-3">
             <div class="col-md-4">
-                <div class="input-group">
-                    <input type="text" name="search" class="form-control" placeholder="Search logs..." value="{{ search_query }}">
-                </div>
+              <label class="form-label fw-medium">Search</label>
+              <input type="text" name="search" class="form-control" placeholder="Search logs..." value="{{ search_query }}">
             </div>
             <div class="col-md-3">
-                <select name="field" class="form-control">
-                    <option value="">Filter by field...</option>
-                    <option value="log_level" {% if field_filter == 'log_level' %}selected{% endif %}>Log Level</option>
-                    <option value="source" {% if field_filter == 'source' %}selected{% endif %}>Source</option>
-                    <option value="resource_id" {% if field_filter == 'resource_id' %}selected{% endif %}>Resource ID</option>
-                </select>
+              <label class="form-label fw-medium">Field</label>
+              <select name="field" class="form-select">
+                <option value="">Filter by field...</option>
+                <option value="event_type" {% if field_filter == 'event_type' %}selected{% endif %}>Event Type</option>
+                <option value="event_source" {% if field_filter == 'event_source' %}selected{% endif %}>Event Source</option>
+                <option value="event_name" {% if field_filter == 'event_name' %}selected{% endif %}>Event Name</option>
+                <option value="user_identity" {% if field_filter == 'user_identity' %}selected{% endif %}>User Identity</option>
+                <option value="region" {% if field_filter == 'region' %}selected{% endif %}>Region</option>
+              </select>
             </div>
             <div class="col-md-3">
-                <input type="text" name="field_value" class="form-control" placeholder="Field value..." value="{{ field_value }}">
+              <label class="form-label fw-medium">Value</label>
+              <input type="text" name="field_value" class="form-control" placeholder="Field value..." value="{{ field_value }}">
             </div>
             <div class="col-md-2">
-                <select name="sort" class="form-control">
-                    <option value="-timestamp" {% if sort_order == '-timestamp' %}selected{% endif %}>Newest First</option>
-                    <option value="timestamp" {% if sort_order == 'timestamp' %}selected{% endif %}>Oldest First</option>
-                </select>
+              <label class="form-label fw-medium">Sort</label>
+              <select name="sort" class="form-select">
+                <option value="-event_time" {% if sort_order == '-event_time' %}selected{% endif %}>Newest First</option>
+                <option value="event_time" {% if sort_order == 'event_time' %}selected{% endif %}>Oldest First</option>
+              </select>
             </div>
-        </div>
-        <button type="submit" class="btn btn-primary mt-2">Apply Filters</button>
-    </form>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Date Range</label>
+              <div class="input-group">
+                <span class="input-group-text">From</span>
+                <input type="date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}">
+                <span class="input-group-text">To</span>
+                <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}">
+              </div>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter me-2"></i>Apply Filters
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
 
-    <!-- Logs Table -->
-    <div class="table-responsive">
-        <table class="table table-striped">
+    <!-- Logs Table Card -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Log Entries</h2>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
             <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Level</th>
-                    <th>Source</th>
-                    <th>Resource ID</th>
-                    <th>Message</th>
-                </tr>
+              <tr>
+                <th>Actions</th>
+                <th>Event Time</th>
+                <th>Event Type</th>
+                <th>Event Source</th>
+                <th>Event Name</th>
+                <th>User Identity</th>
+                <th>Region</th>
+                <th>IP Address</th>
+                <th>Resources</th>
+              </tr>
             </thead>
             <tbody>
-                {% for log in object_list %}
+              {% for log in object_list %}
                 <tr>
-                    <td>{{ log.timestamp }}</td>
-                    <td><span class="badge {% if log.log_level == 'ERROR' %}bg-danger{% elif log.log_level == 'WARNING' %}bg-warning{% else %}bg-info{% endif %}">
-                        {{ log.log_level }}
-                    </span></td>
-                    <td>{{ log.source }}</td>
-                    <td>{{ log.resource_id }}</td>
-                    <td>{{ log.message }}</td>
+                  <td class="text-nowrap">
+                    <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#viewLogModal-{{ log.id }}">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                    {% for tag in log.tags.all %}
+                      <span class="badge bg-info" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#editTagModal-{{ log.id }}-{{ tag.id }}">
+                        {{ tag.name }}
+                      </span>
+                    {% empty %}
+                      <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addTagModal-{{ log.id }}">
+                        <i class="fas fa-tag"></i>
+                      </button>
+                    {% endfor %}
+                  </td>
+                  <td>{{ log.event_time }}</td>
+                  <td>{{ log.event_type }}</td>
+                  <td>{{ log.event_source }}</td>
+                  <td>{{ log.event_name }}</td>
+                  <td>{{ log.user_identity }}</td>
+                  <td>{{ log.region }}</td>
+                  <td>{{ log.ip_address }}</td>
+                  <td>{{ log.resources|truncatechars:50 }}</td>
                 </tr>
-                {% empty %}
+              {% empty %}
                 <tr>
-                    <td colspan="5" class="text-center">No logs found.</td>
+                  <td colspan="9" class="text-center py-4 text-muted">No logs found matching your criteria.</td>
                 </tr>
-                {% endfor %}
+              {% endfor %}
             </tbody>
-        </table>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- Pagination -->
     {% if is_paginated %}
-    <nav aria-label="Page navigation">
+      <nav class="mt-4" aria-label="Page navigation">
         <ul class="pagination justify-content-center">
-            {% if page_obj.has_previous %}
+          {% if page_obj.has_previous %}
             <li class="page-item">
-                <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">&laquo; First</a>
+              <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">
+                <i class="fas fa-angle-double-left"></i>
+              </a>
             </li>
             <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Previous</a>
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">
+                Previous
+              </a>
             </li>
-            {% endif %}
+          {% endif %}
 
-            <li class="page-item active">
-                <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
-            </li>
-
-            {% if page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Next</a>
-            </li>
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Last &raquo;</a>
-            </li>
+          {% for i in page_obj.paginator.page_range %}
+            {% if page_obj.number == i %}
+              <li class="page-item active">
+                <span class="page-link">{{ i }}</span>
+              </li>
+            {% elif i > page_obj.number|add:'-4' and i < page_obj.number|add:'4' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ i }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">{{ i }}</a>
+              </li>
             {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Next</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">
+                <i class="fas fa-angle-double-right"></i>
+              </a>
+            </li>
+          {% endif %}
         </ul>
-    </nav>
+      </nav>
     {% endif %}
+  </div>
+</section>
+
+<!-- Add Tag Modals -->
+{% for log in object_list %}
+<div class="modal fade" id="addTagModal-{{ log.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Tag to Log</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{% url 'data:add_tag_to_log' log.id %}" method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Select Tag</label>
+                        <select name="tag_id" class="form-select">
+                            {% for tag in all_tags %}
+                            <option value="{{ tag.id }}">{{ tag.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Tag</button>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- View Full Log Modals -->
+<div class="modal fade" id="viewLogModal-{{ log.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Full Log Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <pre class="bg-light p-3"><code>{{ log.raw_data }}</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Edit Tag Modals -->
+{% for log in object_list %}
+    {% for tag in log.tags.all %}
+    <div class="modal fade" id="editTagModal-{{ log.id }}-{{ tag.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Tag</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="{% url 'data:edit_log_tag' log.id tag.id %}" method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="form-label">Select New Tag</label>
+                            <select name="new_tag_id" class="form-select">
+                                {% for available_tag in all_tags %}
+                                <option value="{{ available_tag.id }}" {% if available_tag.id == tag.id %}selected{% endif %}>
+                                    {{ available_tag.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary">Update Tag</button>
+                            <button type="submit" class="btn btn-danger" formaction="{% url 'data:remove_log_tag' log.id tag.id %}">
+                                Remove Tag
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% endfor %}
+
 {% endblock %} 

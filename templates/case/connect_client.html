@@ -3,21 +3,36 @@
 {% load static %}
 {% block app %}
 
-<div class="container p-4">
-    <h1 class="fs-4 fw-bold mb-4">Connect a Client to Case: {{ case.name }}</h1>
-    <div class="row g-4">
-        <!-- AWS -->
-        <div class="col-12 col-md-4">
-            <div class="card shadow-sm text-center">
-                <div class="card-body">
-                    <img src="{% static 'images/cloud/aws.svg' %}" alt="AWS" class="mb-3" style="width: 64px; height: 64px;">
-                    <h2 class="fs-5 fw-bold">AWS</h2>
-                    <a href="{% url 'aws:connect_aws' slug=case.slug %}" class="btn btn-primary mt-3">Connect AWS</a>
-                </div>
-            </div>
-        </div>
-        <!-- Add GCP and Azure options later -->
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Connect Client</h1>
+        <p class="text-muted mb-0">{{ case.name }}</p>
+      </div>
+      <a href="{% url 'case:case_detail' slug=case.slug %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Case
+      </a>
     </div>
-</div>
+
+    <!-- Cloud Providers -->
+    <div class="row g-4">
+      <!-- AWS -->
+      <div class="col-12 col-md-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-body text-center p-4">
+            <img src="{% static 'images/cloud/aws.svg' %}" alt="AWS" class="mb-3" style="width: 64px;">
+            <h2 class="h5 mb-3">Amazon Web Services</h2>
+            <a href="{% url 'aws:connect_aws' slug=case.slug %}" class="btn btn-primary">
+              <i class="fas fa-plug me-2"></i>Connect AWS
+            </a>
+          </div>
+        </div>
+      </div>
+      <!-- Placeholder for future providers -->
+    </div>
+  </div>
+</section>
 
 {% endblock %}

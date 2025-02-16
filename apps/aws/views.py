@@ -1,7 +1,7 @@
 import boto3
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import AWSAccount, AWSResource, AWSLogSource, AWSCredential
+from .models import AWSAccount, AWSResource, AWSLogSource, AWSCredential, Tag
 from .forms import AWSAccountForm, FetchCloudTrailLogsForm
 from apps.case.models import Case
 from .utils import validate_aws_credentials 
@@ -58,7 +58,7 @@ def connect_aws(request, slug):
 # Edit aws connection
 @login_required
 def edit_account(request, account_id):
-    account = get_object_or_404(AWSAccount, id=account_id)
+    account = get_object_or_404(AWSAccount, account_id=account_id)
     if request.method == "POST":
         form = AWSAccountForm(request.POST, instance=account)
         if form.is_valid():
@@ -101,7 +101,14 @@ def aws_resource_details(request, resource_id):
     Fetch and return details for a specific AWS resource.
     """
     resource = get_object_or_404(AWSResource, id=resource_id)
-    return render(request, 'aws/resource_details.html', {'resource': resource})
+    account = resource.account
+    case = account.case
+    
+    return render(request, 'aws/resource_details.html', {
+        'resource': resource,
+        'account': account,
+        'case': case
+    })
 
 # this renders both the aws resources and logging sources into one page
 @login_required
@@ -130,6 +137,9 @@ def account_resources(request, account_id):
 
     aws_credentials = AWSCredential.objects.filter(account=aws_account)
     
+    # Get all available tags
+    all_tags = Tag.objects.all()
+    
     context = {
         'aws_account': aws_account,
         'case': case,
@@ -137,10 +147,11 @@ def account_resources(request, account_id):
         'grouped_log_sources': grouped_log_sources,
         'error_messages': error_messages,
         'aws_credentials': aws_credentials,
+        'all_tags': all_tags,
     }
     return render(request, 'aws/account_resources.html', context)
 
-
+# The main view to display the overview of the logs for a specific AWS account.
 @login_required
 def normalized_logs_view(request, account_id):
     aws_account = get_object_or_404(AWSAccount, account_id=account_id)
@@ -181,17 +192,23 @@ def normalized_logs_view(request, account_id):
     }
     return render(request, "aws/get_logs.html", context)
 
+# Fetch and return details for a specific AWS log source using its slug.
 @login_required
 def aws_logsource_details(request, slug):
     """
-    Fetch and return details for a specific AWS log source using its slug.
+    Fetch and return details for a specific AWS log source.
     """
     log_source = get_object_or_404(AWSLogSource, slug=slug)
-
+    account = log_source.account  # Get the AWS account
+    case = account.case
+    
     context = {
         'log_source': log_source,
+        'account': account,
+        'case': case,
+        'aws_account': account  # Add this for consistency with other templates
     }
-
+    
     return render(request, 'aws/logsource_details.html', context)
 
 # This allows a user to pull CloudTrail logs that are stored in an s3 bucket. 
@@ -205,20 +222,84 @@ def browse_s3_structure(request):
     session = boto3.Session(
         aws_access_key_id=account.aws_access_key,
         aws_secret_access_key=account.aws_secret_key,
-        region_name=resource.aws_region or account.default_region)
+        region_name=resource.aws_region or account.aws_region)
     s3 = session.client("s3")
     bucket_name = resource.resource_name or resource.resource_id
 
     if current_prefix and not current_prefix.endswith("/"):
         current_prefix += "/"
 
-    paginator   = s3.get_paginator("list_objects_v2")
-    subfolders  = []
+    paginator = s3.get_paginator("list_objects_v2")
+    subfolders = []
+    files = []
+    
     for page in paginator.paginate(Bucket=bucket_name, Prefix=current_prefix, Delimiter="/"):
+        # Get subfolders
         for cp in page.get("CommonPrefixes", []):
             subfolders.append(cp["Prefix"])
+        
+        # Get files
+        for obj in page.get("Contents", []):
+            if not obj["Key"].endswith("/"):  # Skip folder objects
+                files.append({
+                    "key": obj["Key"],
+                    "size": obj["Size"],
+                    "last_modified": obj["LastModified"].isoformat()
+                })
 
-    return JsonResponse({"subfolders": subfolders})
+    return JsonResponse({
+        "subfolders": subfolders,
+        "files": files
+    })
+
+# Helper function to suggest CloudTrail prefixes based on date range
+@login_required
+def suggest_cloudtrail_prefix(request):
+    """Endpoint to automatically suggest CloudTrail prefixes based on date range"""
+    resource_id = request.GET.get("resource_id")
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
+    
+    if not all([resource_id, start_date, end_date]):
+        return JsonResponse({"error": "Missing required parameters"}, status=400)
+    
+    try:
+        resource = get_object_or_404(AWSResource, id=resource_id)
+        account = resource.account
+        
+        # Use resource region or fall back to account's default region
+        region = resource.aws_region or account.aws_region
+        if not region:
+            return JsonResponse({"error": "No region specified for resource or account"}, status=400)
+
+        # Convert dates to datetime objects
+        start_date = datetime.strptime(start_date, "%Y-%m-%d")
+        end_date = datetime.strptime(end_date, "%Y-%m-%d")
+
+        # Generate list of possible prefixes based on date range
+        prefixes = []
+        current_date = start_date
+        while current_date <= end_date:
+            # Standard CloudTrail log path structure:
+            # AWSLogs/aws-account-id/CloudTrail/region/YYYY/MM/DD/
+            prefix = (f"AWSLogs/{account.account_id}/CloudTrail/{region}/"
+                     f"{current_date.strftime('%Y/%m/%d/')}")
+            prefixes.append(prefix)
+            current_date += timedelta(days=1)
+
+        # Also suggest the root CloudTrail directory
+        root_prefix = f"AWSLogs/{account.account_id}/CloudTrail/{region}/"
+        if root_prefix not in prefixes:
+            prefixes.insert(0, root_prefix)
+
+        return JsonResponse({
+            "prefixes": prefixes,
+            "account_id": account.account_id,
+            "region": region
+        })
+    except Exception as e:
+        logger.error(f"Error generating CloudTrail prefixes: {str(e)}")
+        return JsonResponse({"error": str(e)}, status=500)
 
 @login_required
 def fetch_cloudtrail_logs(request, account_id):
@@ -235,20 +316,40 @@ def fetch_cloudtrail_logs(request, account_id):
                 messages.error(request, "Selected bucket is not linked to this AWS account.")
                 return redirect("case:case_detail", slug=resource.case.slug)
 
+            # If prefix doesn't start with the standard CloudTrail structure, construct it
+            if not prefix.startswith("AWSLogs/"):
+                region = resource.aws_region or aws_account.aws_region
+                if not region:
+                    messages.error(request, "No region specified for resource or account")
+                    return redirect("aws:fetch_cloudtrail_logs", account_id=account_id)
+                
+                # Construct the full CloudTrail path
+                base_prefix = f"AWSLogs/{aws_account.account_id}/CloudTrail/{region}/"
+                
+                # If prefix is just a date path (YYYY/MM/DD/), append it to base_prefix
+                if prefix.count('/') == 3:  # Format: YYYY/MM/DD/
+                    prefix = base_prefix + prefix
+                else:
+                    prefix = base_prefix
+
             fetch_normalize_cloudtrail_logs_task.delay(
                 account_id=aws_account.account_id,
                 resource_id=resource.id,
-                prefix=prefix or "",
+                prefix=prefix,
                 start_date=str(start_date),
                 end_date=str(end_date),
                 case_id=resource.case.id
             )
             messages.success(request, "CloudTrail log fetching has been queued.")
-            return redirect("aws:get_logs", account_id=aws_account.account_id)
+            return redirect("aws:normalized_logs", account_id=aws_account.account_id)
     else:
         form = FetchCloudTrailLogsForm()
 
-    return render(request, "aws/fetch_cloudtrail_logs.html", {"form": form, "account_id": account_id})
+    return render(request, "aws/fetch_cloudtrail_logs.html", {
+        "form": form, 
+        "account_id": account_id,
+        "aws_account": aws_account
+    })
 
 @login_required
 def trigger_management_event_fetch(request, account_id):
@@ -260,7 +361,7 @@ def trigger_management_event_fetch(request, account_id):
     messages.success(request, "Management event history is being fetched.")
     logger.info(f"Task queued for AWS account {account_id}")
 
-    return redirect("aws:get_logs", account_id=aws_account.account_id)
+    return redirect("aws:normalized_logs", account_id=aws_account.account_id)
 
 @login_required
 def aws_credential_details(request, slug):
@@ -276,4 +377,157 @@ def aws_credential_details(request, slug):
     }
     
     return render(request, 'aws/credential_details.html', context)
+
+@login_required
+def add_tag_to_resource(request, resource_id):
+    if request.method == 'POST':
+        tag_id = request.POST.get('tag_id')
+        try:
+            resource = AWSResource.objects.get(id=resource_id)
+            tag = Tag.objects.get(id=tag_id)
+            resource.tags.add(tag)
+            messages.success(request, f'Tag "{tag.name}" added successfully.')
+        except (AWSResource.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error adding tag.')
+    return redirect('aws:account_resources', account_id=resource.account.account_id)
+
+@login_required
+def add_tag_to_credential(request, credential_id):
+    if request.method == 'POST':
+        tag_id = request.POST.get('tag_id')
+        try:
+            credential = AWSCredential.objects.get(id=credential_id)
+            tag = Tag.objects.get(id=tag_id)
+            credential.tags.add(tag)
+            messages.success(request, f'Tag "{tag.name}" added successfully.')
+        except (AWSCredential.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error adding tag.')
+    return redirect('aws:account_resources', account_id=credential.account.account_id)
+
+@login_required
+def add_tag_to_logsource(request, logsource_id):
+    if request.method == 'POST':
+        tag_id = request.POST.get('tag_id')
+        try:
+            logsource = AWSLogSource.objects.get(id=logsource_id)
+            tag = Tag.objects.get(id=tag_id)
+            logsource.tags.add(tag)
+            messages.success(request, f'Tag "{tag.name}" added successfully.')
+        except (AWSLogSource.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error adding tag.')
+    return redirect('aws:account_resources', account_id=logsource.account.account_id)
+
+@login_required
+def edit_resource_tag(request, resource_id, tag_id):
+    if request.method == 'POST':
+        new_tag_id = request.POST.get('new_tag_id')
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            resource = AWSResource.objects.get(id=resource_id)
+            old_tag = Tag.objects.get(id=tag_id)
+            new_tag = Tag.objects.get(id=new_tag_id)
+            
+            resource.tags.remove(old_tag)
+            resource.tags.add(new_tag)
+            messages.success(request, f'Tag updated from "{old_tag.name}" to "{new_tag.name}"')
+        except (AWSResource.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error updating tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+    return redirect('aws:account_resources', account_id=resource.account.account_id)
+
+@login_required
+def edit_credential_tag(request, credential_id, tag_id):
+    if request.method == 'POST':
+        new_tag_id = request.POST.get('new_tag_id')
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            credential = AWSCredential.objects.get(id=credential_id)
+            old_tag = Tag.objects.get(id=tag_id)
+            new_tag = Tag.objects.get(id=new_tag_id)
+            
+            credential.tags.remove(old_tag)
+            credential.tags.add(new_tag)
+            messages.success(request, f'Tag updated from "{old_tag.name}" to "{new_tag.name}"')
+        except (AWSCredential.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error updating tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+    return redirect('aws:account_resources', account_id=credential.account.account_id)
+
+@login_required
+def edit_logsource_tag(request, logsource_id, tag_id):
+    if request.method == 'POST':
+        new_tag_id = request.POST.get('new_tag_id')
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            logsource = AWSLogSource.objects.get(id=logsource_id)
+            old_tag = Tag.objects.get(id=tag_id)
+            new_tag = Tag.objects.get(id=new_tag_id)
+            
+            logsource.tags.remove(old_tag)
+            logsource.tags.add(new_tag)
+            messages.success(request, f'Tag updated from "{old_tag.name}" to "{new_tag.name}"')
+        except (AWSLogSource.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error updating tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+    return redirect('aws:account_resources', account_id=logsource.account.account_id)
+
+@login_required
+def remove_tag_from_resource(request, resource_id, tag_id):
+    if request.method == 'POST':
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            resource = AWSResource.objects.get(id=resource_id)
+            tag = Tag.objects.get(id=tag_id)
+            resource.tags.remove(tag)
+            messages.success(request, f'Tag "{tag.name}" removed successfully.')
+        except (AWSResource.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error removing tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+    return redirect('aws:account_resources', account_id=resource.account.account_id)
+
+@login_required
+def remove_tag_from_credential(request, credential_id, tag_id):
+    if request.method == 'POST':
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            credential = AWSCredential.objects.get(id=credential_id)
+            tag = Tag.objects.get(id=tag_id)
+            credential.tags.remove(tag)
+            messages.success(request, f'Tag "{tag.name}" removed successfully.')
+        except (AWSCredential.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error removing tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+    return redirect('aws:account_resources', account_id=credential.account.account_id)
+
+@login_required
+def remove_tag_from_logsource(request, logsource_id, tag_id):
+    if request.method == 'POST':
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            logsource = AWSLogSource.objects.get(id=logsource_id)
+            tag = Tag.objects.get(id=tag_id)
+            logsource.tags.remove(tag)
+            messages.success(request, f'Tag "{tag.name}" removed successfully.')
+        except (AWSLogSource.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error removing tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+    return redirect('aws:account_resources', account_id=logsource.account.account_id)
 

@@ -69,5 +69,21 @@ class NormalizedLog(models.Model):
         unique_together = (("case", "event_id"),)
 
 
+class DetectionResult(models.Model):
+    case = models.ForeignKey('case.Case', on_delete=models.CASCADE)
+    detection = models.ForeignKey('analysis.Detection', on_delete=models.CASCADE)
+    matched_log = models.ForeignKey('NormalizedLog', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.detection.name} - {self.matched_log.event_name}"
+
+
 
 

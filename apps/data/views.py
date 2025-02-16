@@ -1,40 +1,80 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
-from apps.data.models import NormalizedLog
+from apps.data.models import NormalizedLog, Tag
+from datetime import datetime
+from django.contrib import messages
+from apps.aws.models import AWSAccount
 
 @login_required
 def NormalizedLogListView(request):
-    # Get all logs and apply default sorting
+    # Get account_id from query params if it exists
+    account_id = request.GET.get('account_id')
+    aws_account = None
+    case = None
+    
     queryset = NormalizedLog.objects.all().order_by('-event_time')
     
-    # Get filter parameters from request
+    # Filter by account if specified
+    if account_id:
+        aws_account = get_object_or_404(AWSAccount, account_id=account_id)
+        queryset = queryset.filter(aws_account=aws_account)
+        case = aws_account.case
+    
     search_query = request.GET.get('search', '')
     field_filter = request.GET.get('field', '')
     field_value = request.GET.get('field_value', '')
     sort_order = request.GET.get('sort', '-event_time')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
     
-    # Apply search if query exists
+    # Validate sort_order field
+    valid_sort_fields = [
+        'event_time', '-event_time',
+        'event_type', '-event_type',
+        'event_source', '-event_source',
+        'event_name', '-event_name',
+        'user_identity', '-user_identity',
+        'region', '-region',
+        'ip_address', '-ip_address'
+    ]
+    if sort_order not in valid_sort_fields:
+        sort_order = '-event_time'
+    
+    if start_date:
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            queryset = queryset.filter(event_time__gte=start_date)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            queryset = queryset.filter(event_time__lte=end_date)
+        except ValueError:
+            pass
+    
     if search_query:
         queryset = queryset.filter(
             Q(event_name__icontains=search_query) |
             Q(event_source__icontains=search_query) |
             Q(event_type__icontains=search_query) |
             Q(user_identity__icontains=search_query) |
+            Q(region__icontains=search_query) |
             Q(resources__icontains=search_query)
         )
     
-    # Apply field-specific filter if specified
     if field_filter and field_value:
         filter_kwargs = {f"{field_filter}__icontains": field_value}
         queryset = queryset.filter(**filter_kwargs)
     
-    # Apply sorting
-    queryset = queryset.order_by(sort_order.replace('timestamp', 'event_time'))
+    queryset = queryset.order_by(sort_order)
     
-    # Pagination
-    paginator = Paginator(queryset, 50)  # Show 50 logs per page
+    all_tags = Tag.objects.all()
+    
+    paginator = Paginator(queryset, 100)
     page_number = request.GET.get('page', 1)
     page_obj = paginator.get_page(page_number)
     
@@ -45,7 +85,75 @@ def NormalizedLogListView(request):
         'field_filter': field_filter,
         'field_value': field_value,
         'sort_order': sort_order,
+        'start_date': start_date,
+        'end_date': end_date,
         'is_paginated': page_obj.has_other_pages(),
+        'all_tags': all_tags,
+        'aws_account': aws_account,
+        'case': case
     }
     
     return render(request, 'data/normalized_logs.html', context)
+
+@login_required
+def add_tag_to_log(request, log_id):
+    if request.method == 'POST':
+        tag_id = request.POST.get('tag_id')
+        # Get the referer URL with all its query parameters
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            log = NormalizedLog.objects.get(id=log_id)
+            tag = Tag.objects.get(id=tag_id)
+            log.tags.add(tag)
+            messages.success(request, f'Tag "{tag.name}" added successfully.')
+        except (NormalizedLog.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error adding tag.')
+        
+        # If we have a referer URL, redirect back to it to preserve filters
+        if redirect_url:
+            return redirect(redirect_url)
+            
+    return redirect('data:normalized_logs')
+
+@login_required
+def edit_log_tag(request, log_id, tag_id):
+    if request.method == 'POST':
+        new_tag_id = request.POST.get('new_tag_id')
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            log = NormalizedLog.objects.get(id=log_id)
+            old_tag = Tag.objects.get(id=tag_id)
+            new_tag = Tag.objects.get(id=new_tag_id)
+            
+            # Remove old tag and add new tag
+            log.tags.remove(old_tag)
+            log.tags.add(new_tag)
+            
+            messages.success(request, f'Tag updated from "{old_tag.name}" to "{new_tag.name}"')
+        except (NormalizedLog.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error updating tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+            
+    return redirect('data:normalized_logs')
+
+@login_required
+def remove_log_tag(request, log_id, tag_id):
+    if request.method == 'POST':
+        redirect_url = request.META.get('HTTP_REFERER', '')
+        
+        try:
+            log = NormalizedLog.objects.get(id=log_id)
+            tag = Tag.objects.get(id=tag_id)
+            log.tags.remove(tag)
+            messages.success(request, f'Tag "{tag.name}" removed successfully.')
+        except (NormalizedLog.DoesNotExist, Tag.DoesNotExist):
+            messages.error(request, 'Error removing tag.')
+        
+        if redirect_url:
+            return redirect(redirect_url)
+            
+    return redirect('data:normalized_logs')

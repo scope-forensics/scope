@@ -2,43 +2,61 @@
 {% load i18n %}
 {% load static %}
 {% block app %}
-<div class="container p-6">
-    <h1 class="fs-4 fw-bold mb-4">Resource Details</h1>
-
-    <!-- Resource Information -->
-    <div class="bg-white rounded shadow-sm p-4">
-        <h2 class="fs-5 fw-semibold text-dark">{{ resource.resource_name|default:resource.resource_id }}</h2>
-        <p class="small text-muted"><strong>Resource Type:</strong> {{ resource.resource_type }}</p>
-        <p class="small text-muted"><strong>Region:</strong> {{ resource.aws_region }}</p>
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Resource Details</h1>
+        <p class="text-muted mb-0">{{ resource.resource_name|default:resource.resource_id }}</p>
+      </div>
+      <a href="{% url 'aws:account_resources' account_id=account.account_id %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Account
+      </a>
     </div>
 
-    <!-- Resource Details Section -->
-    <div class="mt-4">
-        <h3 class="fs-6 fw-medium text-dark">Resource Details</h3>
-        <ul class="list-unstyled mt-2">
-            {% for key, value in resource.resource_details.items %}
-            <li class="d-flex">
-                <strong class="text-dark me-2" style="min-width: 150px;">{{ key }}:</strong>
-                <span>
-                    {% if value is iterable and value.items %}
-                    <!-- Handle Nested Dictionary -->
-                    <ul class="list-unstyled ms-3">
-                        {% for nested_key, nested_value in value.items %}
-                        <li class="d-flex">
-                            <strong class="text-dark me-2" style="min-width: 100px;">{{ nested_key }}</strong>: 
-                            <span>{{ nested_value }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% elif value is iterable and value|length > 50 %}
-                    <pre class="text-break">{{ value }}</pre>
-                    {% else %}
-                    {{ value }}
-                    {% endif %}
-                </span>
-            </li>
-            {% endfor %}
-        </ul>
+    <!-- Basic Information -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Basic Information</h2>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-3">Resource Type</dt>
+          <dd class="col-sm-9">{{ resource.resource_type }}</dd>
+
+          <dt class="col-sm-3">Region</dt>
+          <dd class="col-sm-9">{{ resource.aws_region }}</dd>
+        </dl>
+      </div>
     </div>
-</div>
+
+    <!-- Resource Details -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Resource Details</h2>
+      </div>
+      <div class="card-body">
+        {% for key, value in resource.resource_details.items %}
+          <div class="mb-3">
+            <h3 class="h6 fw-medium mb-2">{{ key }}</h3>
+            {% if value is iterable and value.items %}
+              <!-- Handle Nested Dictionary -->
+              <dl class="row mb-0 ms-3">
+                {% for nested_key, nested_value in value.items %}
+                  <dt class="col-sm-3">{{ nested_key }}</dt>
+                  <dd class="col-sm-9">{{ nested_value }}</dd>
+                {% endfor %}
+              </dl>
+            {% elif value is iterable and value|length > 50 %}
+              <pre class="bg-light p-3 rounded"><code>{{ value }}</code></pre>
+            {% else %}
+              <p class="text-muted mb-0">{{ value }}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
 {% endblock %}
