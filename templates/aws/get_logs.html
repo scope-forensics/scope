@@ -1,0 +1,129 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block app %}
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">AWS Logs</h1>
+        <p class="text-muted mb-0">Account {{ aws_account.account_id }}</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'aws:account_resources' account_id=aws_account.account_id %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-2"></i>Back to Account
+        </a>
+        <a href="{% url 'aws:fetch_cloudtrail_logs' aws_account.account_id %}" class="btn btn-primary">
+          <i class="fas fa-cloud-download-alt me-2"></i>CloudTrail Logs
+        </a>
+        <a href="{% url 'aws:fetch_management_events' aws_account.account_id %}" class="btn btn-primary">
+          <i class="fas fa-history me-2"></i>Management Logs
+        </a>
+        <a href="{% url 'data:normalized_logs' %}" class="btn btn-primary">
+          <i class="fas fa-search me-2"></i>Log Explorer
+        </a>
+      </div>
+    </div>
+
+    <!-- Date Filter -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Date Range</h2>
+      </div>
+      <div class="card-body">
+        <form method="get">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label for="start_date" class="form-label">Start Date</label>
+              <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-5">
+              <label for="end_date" class="form-label">End Date</label>
+              <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="fas fa-filter me-2"></i>Filter
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="row g-4">
+      <!-- Top Users -->
+      <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-transparent">
+            <h2 class="h5 mb-0">Top Users</h2>
+          </div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+              {% for user in top_users %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <span class="text-truncate">{{ user.user_identity|default:"Unknown User" }}</span>
+                  <span class="badge bg-primary rounded-pill">{{ user.count }}</span>
+                </div>
+              {% empty %}
+                <div class="list-group-item text-center text-muted py-4">
+                  No users found
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top IPs -->
+      <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-transparent">
+            <h2 class="h5 mb-0">Top IP Addresses</h2>
+          </div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+              {% for ip in top_ips %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <span class="text-truncate">{{ ip.ip_address|default:"Unknown IP" }}</span>
+                  <span class="badge bg-primary rounded-pill">{{ ip.count }}</span>
+                </div>
+              {% empty %}
+                <div class="list-group-item text-center text-muted py-4">
+                  No IP addresses found
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Events -->
+      <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-transparent">
+            <h2 class="h5 mb-0">Top Events</h2>
+          </div>
+          <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+              {% for event in top_events %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <span class="text-truncate">{{ event.event_name|default:"Unknown Event" }}</span>
+                  <span class="badge bg-primary rounded-pill">{{ event.count }}</span>
+                </div>
+              {% empty %}
+                <div class="list-group-item text-center text-muted py-4">
+                  No events found
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

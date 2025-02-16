@@ -1,0 +1,83 @@
+{% extends 'web/app/app_base.html' %}
+
+{% block app %}
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Detection Rules</h1>
+        <p class="text-muted mb-0">Case {{ case.name }}</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'analysis:case_detections' case.id %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-2"></i>Back to Detections
+        </a>
+        <a href="{% url 'analysis:detection_create' case.id %}" class="btn btn-primary">
+          <i class="fas fa-plus me-2"></i>Add Detection
+        </a>
+        <form method="post" action="{% url 'analysis:load_prebuilt_rules' case.id %}" class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-download me-2"></i>Load Pre-built Rules
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Rules Table Card -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Detection Rules</h2>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Cloud</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for detection in detections %}
+                <tr>
+                  <td>{{ detection.name }}</td>
+                  <td>{{ detection.get_cloud_display }}</td>
+                  <td>{{ detection.get_detection_type_display }}</td>
+                  <td>
+                    <span class="badge {% if detection.severity == 'high' %}bg-danger{% elif detection.severity == 'medium' %}bg-warning{% else %}bg-info{% endif %}">
+                      {{ detection.get_severity_display }}
+                    </span>
+                  </td>
+                  <td>
+                    {% if detection.enabled %}
+                      <span class="badge bg-success text-white">Enabled</span>
+                    {% else %}
+                      <span class="badge bg-secondary text-white">Disabled</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="btn-group">
+                      <a href="{% url 'analysis:detection_edit' case.id detection.pk %}" class="btn btn-sm btn-light">
+                        <i class="fas fa-edit"></i>
+                      </a>
+                      <a href="{% url 'analysis:detection_delete' case.id detection.pk %}" class="btn btn-sm btn-light">
+                        <i class="fas fa-trash"></i>
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %} 
