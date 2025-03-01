@@ -6,22 +6,52 @@ from apps.data.models import NormalizedLog, Tag
 from datetime import datetime
 from django.contrib import messages
 from apps.aws.models import AWSAccount
+from apps.azure.models import AzureAccount
 
 @login_required
 def NormalizedLogListView(request):
-    # Get account_id from query params if it exists
-    account_id = request.GET.get('account_id')
-    aws_account = None
+    # Get account filter from query params
+    account_filter = request.GET.get('account')
     case = None
     
+    # Start with all logs
     queryset = NormalizedLog.objects.all().order_by('-event_time')
     
-    # Filter by account if specified
-    if account_id:
-        aws_account = get_object_or_404(AWSAccount, account_id=account_id)
-        queryset = queryset.filter(aws_account=aws_account)
-        case = aws_account.case
+    # Parse account filter (format: "aws:account_id" or "azure:subscription_id")
+    if account_filter:
+        account_type, account_id = account_filter.split(':')
+        if account_type == 'aws':
+            aws_account = get_object_or_404(AWSAccount, account_id=account_id)
+            queryset = queryset.filter(aws_account=aws_account)
+            case = aws_account.case
+        elif account_type == 'azure':
+            azure_account = get_object_or_404(AzureAccount, subscription_id=account_id)
+            queryset = queryset.filter(azure_account=azure_account)
+            case = azure_account.case
     
+    # Get unique accounts that have logs
+    accounts = []
+    aws_accounts = AWSAccount.objects.filter(
+        normalized_logs__isnull=False
+    ).distinct()
+    azure_accounts = AzureAccount.objects.filter(
+        normalized_logs__isnull=False
+    ).distinct()
+    
+    for aws_acc in aws_accounts:
+        accounts.append({
+            'id': f'aws:{aws_acc.account_id}',
+            'name': f'AWS Account: {aws_acc.account_id}',
+            'type': 'aws'
+        })
+    
+    for azure_acc in azure_accounts:
+        accounts.append({
+            'id': f'azure:{azure_acc.subscription_id}',
+            'name': f'Azure Account: {azure_acc.subscription_id}',
+            'type': 'azure'
+        })
+
     search_query = request.GET.get('search', '')
     field_filter = request.GET.get('field', '')
     field_value = request.GET.get('field_value', '')
@@ -89,7 +119,8 @@ def NormalizedLogListView(request):
         'end_date': end_date,
         'is_paginated': page_obj.has_other_pages(),
         'all_tags': all_tags,
-        'aws_account': aws_account,
+        'accounts': accounts,
+        'selected_account': account_filter,
         'case': case
     }
     

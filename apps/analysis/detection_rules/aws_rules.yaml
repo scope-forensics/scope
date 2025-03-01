@@ -7,7 +7,7 @@
   severity: "medium"
   event_source: "sts.amazonaws.com"
   event_name: "GetCallerIdentity"
-  auto_tags: ["suspicious", "reconnaissance"]
+  auto_tags: ["Suspicious", "Medium"]
   enabled: true
 
 - name: "Root Account Usage"
@@ -17,7 +17,7 @@
   severity: "high"
   event_source: "signin.amazonaws.com"
   additional_criteria: {"user_identity": "root"}
-  auto_tags: ["high-risk", "compliance-violation"]
+  auto_tags: ["High", "Suspicious"]
   enabled: true
 
 - name: "Security Group Modification"
@@ -27,7 +27,7 @@
   severity: "medium"
   event_source: "ec2.amazonaws.com"
   event_name: "AuthorizeSecurityGroupIngress"
-  auto_tags: ["security-group-change", "network-modification"]
+  auto_tags: ["Medium", "Informational"]
   enabled: true
 
 - name: "IAM Policy Changes"
@@ -37,5 +37,5 @@
   severity: "high"
   event_source: "iam.amazonaws.com"
   event_name: "PutRolePolicy"
-  auto_tags: ["iam-change", "privilege-escalation"]
+  auto_tags: ["High", "Suspicious"]
   enabled: true

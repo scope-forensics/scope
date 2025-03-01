@@ -1,0 +1,103 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load static %}
+{% block app %}
+
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Edit GCP Project</h1>
+        <p class="text-muted mb-0">{{ account.project_id }}</p>
+      </div>
+      <a href="{% url 'case:case_detail' slug=account.case.slug %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Case
+      </a>
+    </div>
+
+    <!-- Edit Form Card -->
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST" enctype="multipart/form-data">
+          {% csrf_token %}
+          
+          {% for field in form %}
+            <div class="mb-4">
+              <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+              {% endif %}
+              {% if field.errors %}
+                {% for error in field.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          {% endfor %}
+
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'case:case_detail' slug=account.case.slug %}" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Help Card -->
+    <div class="card shadow-sm mt-4">
+      <div class="card-body">
+        <h5 class="card-title">Service Account Requirements</h5>
+        <ol class="mb-3">
+          <li>Required APIs must be enabled:
+            <ul class="mt-2">
+              <li>Cloud Resource Manager API</li>
+              <li>Cloud Storage API</li>
+              <li>Cloud Logging API</li>
+              <li>Compute Engine API</li>
+            </ul>
+          </li>
+          <li>The service account should have the following roles:
+            <ul class="mt-2">
+              <li>Viewer</li>
+              <li>Security Reviewer</li>
+              <li>Logs Viewer</li>
+            </ul>
+          </li>
+          <li>If you're updating the service account key:
+            <ul class="mt-2">
+              <li>Create a new key in JSON format</li>
+              <li>Upload the new key file</li>
+              <li>The old key will be replaced</li>
+            </ul>
+          </li>
+        </ol>
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>These permissions provide read-only access suitable for incident response and investigation purposes.
+        </div>
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle me-2"></i>Keep your service account key secure and never share it with unauthorized parties.
+        </div>
+        <div class="d-flex flex-column gap-2">
+          <a href="https://cloud.google.com/apis/docs/getting-started" 
+             target="_blank" 
+             class="btn btn-link ps-0">
+            Learn more about enabling GCP APIs
+          </a>
+          <a href="https://cloud.google.com/iam/docs/creating-managing-service-accounts" 
+             target="_blank" 
+             class="btn btn-link ps-0">
+            Learn more about managing GCP service accounts
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %} 

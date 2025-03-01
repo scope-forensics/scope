@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from .models import Case
 from .forms import CaseForm
 from apps.aws.models import AWSAccount
+from apps.azure.models import AzureAccount
+from apps.gcp.models import GCPAccount
 
 # Create a new case for the investigation (this is the first step)
 @login_required
@@ -25,8 +27,10 @@ def create_case(request):
 def case_detail(request, slug):
     case = get_object_or_404(Case, slug=slug)
 
-    # AWS accounts linked to the case
+    # Get accounts linked to the case
     aws_accounts = AWSAccount.objects.filter(case=case)
+    azure_accounts = AzureAccount.objects.filter(case=case)
+    gcp_accounts = GCPAccount.objects.filter(case=case)
 
     # Add GCP and Azure placeholders
     gcp_placeholder = True
@@ -35,8 +39,8 @@ def case_detail(request, slug):
     return render(request, "case/case_detail.html", {
         "case": case,
         "aws_accounts": aws_accounts,
-        "gcp_placeholder": gcp_placeholder,
-        "azure_placeholder": azure_placeholder,
+        "gcp_accounts": gcp_accounts,
+        "azure_accounts": azure_accounts,
     })
 
 # this is used to edit the details of a case

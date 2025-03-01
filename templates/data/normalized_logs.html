@@ -9,9 +9,19 @@
       <div>
         <h1 class="h3 mb-0">Log Explorer</h1>
       </div>
-      <a href="" class="btn btn-outline-secondary">
-        <i class="fas fa-arrow-left me-2"></i>Back to Account
-      </a>
+      {% if selected_aws_account %}
+        <a href="{% url 'aws:account_resources' account_id=selected_aws_account %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-2"></i>Back to AWS Account
+        </a>
+      {% elif selected_azure_account %}
+        <a href="{% url 'azure:account_resources' subscription_id=selected_azure_account %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-2"></i>Back to Azure Account
+        </a>
+      {% elif case %}
+        <a href="{% url 'case:case_detail' slug=case.slug %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-2"></i>Back to Case
+        </a>
+      {% endif %}
     </div>
 
     <!-- Search and Filter Card -->
@@ -56,6 +66,18 @@
                 <span class="input-group-text">To</span>
                 <input type="date" name="end_date" class="form-control" value="{{ end_date|date:'Y-m-d' }}">
               </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Account</label>
+              <select name="account" class="form-select">
+                <option value="">All Accounts</option>
+                {% for account in accounts %}
+                  <option value="{{ account.id }}" 
+                          {% if selected_account == account.id %}selected{% endif %}>
+                    {{ account.name }}
+                  </option>
+                {% endfor %}
+              </select>
             </div>
             <div class="col-12">
               <button type="submit" class="btn btn-primary">
@@ -131,12 +153,12 @@
         <ul class="pagination justify-content-center">
           {% if page_obj.has_previous %}
             <li class="page-item">
-              <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">
+              <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}{% if selected_account %}&account={{ selected_account }}{% endif %}">
                 <i class="fas fa-angle-double-left"></i>
               </a>
             </li>
             <li class="page-item">
-              <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}{% if selected_account %}&account={{ selected_account }}{% endif %}">
                 Previous
               </a>
             </li>
@@ -149,17 +171,17 @@
               </li>
             {% elif i > page_obj.number|add:'-4' and i < page_obj.number|add:'4' %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ i }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">{{ i }}</a>
+                <a class="page-link" href="?page={{ i }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}{% if selected_account %}&account={{ selected_account }}{% endif %}">{{ i }}</a>
               </li>
             {% endif %}
           {% endfor %}
 
           {% if page_obj.has_next %}
             <li class="page-item">
-              <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">Next</a>
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}{% if selected_account %}&account={{ selected_account }}{% endif %}">Next</a>
             </li>
             <li class="page-item">
-              <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}">
+              <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if field_filter %}&field={{ field_filter }}{% endif %}{% if field_value %}&field_value={{ field_value }}{% endif %}{% if sort_order %}&sort={{ sort_order }}{% endif %}{% if selected_account %}&account={{ selected_account }}{% endif %}">
                 <i class="fas fa-angle-double-right"></i>
               </a>
             </li>

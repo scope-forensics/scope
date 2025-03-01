@@ -1,0 +1,102 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load static %}
+{% block app %}
+
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Connect Azure Account</h1>
+        <p class="text-muted mb-0">{{ case.name }}</p>
+      </div>
+      <a href="{% url 'case:case_detail' slug=case.slug %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Case
+      </a>
+    </div>
+
+    <!-- Connect Form Card -->
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+          {% csrf_token %}
+          
+          {% for field in form %}
+            <div class="mb-4">
+              <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+              {% endif %}
+              {% if field.errors %}
+                {% for error in field.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          {% endfor %}
+
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'case:case_detail' slug=case.slug %}" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-plug me-2"></i>Connect Azure
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Help Card -->
+    <div class="card shadow-sm mt-4">
+      <div class="card-body">
+        <h5 class="card-title">How to get these credentials?</h5>
+        <ol class="mb-3">
+          <li>Go to the Azure Portal and create a new App Registration in Azure Active Directory</li>
+          <li>Note down the Application (client) ID and Directory (tenant) ID</li>
+          <li>Create a new client secret and save it securely</li>
+          <li>Add API permissions in the App Registration:
+            <ul class="mt-2">
+              <li><strong>Microsoft Graph API:</strong>
+                <ul>
+                  <li>Directory.Read.All - Read directory data</li>
+                  <li>User.Read.All - Read all users' profiles</li>
+                  <li>AuditLog.Read.All - Read audit log data</li>
+                  <li>SecurityEvents.Read.All - Read security events</li>
+                </ul>
+              </li>
+              <li>Click "Grant admin consent" for these permissions</li>
+            </ul>
+          </li>
+          <li>Assign RBAC roles at the subscription level (IAM):
+            <ul class="mt-2">
+              <li>Search for your App Registration name</li>
+              <li>Add role assignments:
+                <ul>
+                  <li><strong>Reader</strong></li>
+                  <li><strong>Log Analytics Reader</strong></li>
+                  <li><strong>Security Reader</strong></li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+        </ol>
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>These permissions provide read-only access suitable for incident response and investigation purposes.
+        </div>
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle me-2"></i>Remember to click "Grant admin consent" in API permissions after adding them.
+        </div>
+        <a href="https://docs.microsoft.com/en-us/azure/active-directory/develop/howto-create-service-principal-portal" 
+           target="_blank" 
+           class="btn btn-link ps-0">
+          Learn more about creating an Azure service principal
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
