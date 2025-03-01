@@ -22,7 +22,9 @@
       <div class="col-12 col-md-4">
         <div class="card shadow-sm h-100">
           <div class="card-body text-center p-4">
-            <img src="{% static 'images/cloud/aws.svg' %}" alt="AWS" class="mb-3" style="width: 64px;">
+            <div class="provider-logo mb-3" style="height: 64px; display: flex; align-items: center; justify-content: center;">
+              <img src="{% static 'images/cloud/aws.svg' %}" alt="AWS" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
             <h2 class="h5 mb-3">Amazon Web Services</h2>
             <a href="{% url 'aws:connect_aws' slug=case.slug %}" class="btn btn-primary">
               <i class="fas fa-plug me-2"></i>Connect AWS
@@ -30,7 +32,36 @@
           </div>
         </div>
       </div>
-      <!-- Placeholder for future providers -->
+      
+      <!-- Azure -->
+      <div class="col-12 col-md-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-body text-center p-4">
+            <div class="provider-logo mb-3" style="height: 64px; display: flex; align-items: center; justify-content: center;">
+              <img src="{% static 'images/cloud/azure.svg' %}" alt="Azure" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
+            <h2 class="h5 mb-3">Microsoft Azure</h2>
+            <a href="{% url 'azure:connect_azure' slug=case.slug %}" class="btn btn-primary">
+              <i class="fas fa-plug me-2"></i>Connect Azure
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- GCP -->
+      <div class="col-12 col-md-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-body text-center p-4">
+            <div class="provider-logo mb-3" style="height: 64px; display: flex; align-items: center; justify-content: center;">
+              <img src="{% static 'images/cloud/gcp.svg' %}" alt="GCP" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
+            <h2 class="h5 mb-3">Google Cloud Platform</h2>
+            <a href="{% url 'gcp:connect_gcp' slug=case.slug %}" class="btn btn-primary">
+              <i class="fas fa-plug me-2"></i>Connect GCP
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>

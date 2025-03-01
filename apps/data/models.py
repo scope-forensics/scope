@@ -47,7 +47,8 @@ class NormalizedLog(models.Model):
     raw_data = models.TextField()  # Serialized JSON as text
 
     # Use string reference to break circular import
-    aws_account = models.ForeignKey('aws.AWSAccount', on_delete=models.CASCADE, related_name='normalized_logs')
+    aws_account = models.ForeignKey('aws.AWSAccount', on_delete=models.CASCADE, null=True, blank=True, related_name='normalized_logs')
+    azure_account = models.ForeignKey('azure.AzureAccount', on_delete=models.CASCADE, null=True, blank=True, related_name='normalized_logs')
     tags = models.ManyToManyField(Tag, related_name='normalized_logs')
 
     # Utility

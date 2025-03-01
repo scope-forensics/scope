@@ -1,0 +1,272 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block app %}
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Azure Account Overview</h1>
+        <p class="text-muted mb-0">Subscription: {{ azure_account.subscription_id }}</p>
+      </div>
+      <div class="d-flex gap-2">
+        <a href="{% url 'case:case_detail' slug=case.slug %}" class="btn btn-outline-secondary">
+          <i class="fas fa-arrow-left me-2"></i>Back to Case
+        </a>
+        <a href="{% url 'azure:pull_resources' subscription_id=azure_account.subscription_id %}" class="btn btn-primary">
+          <i class="fas fa-sync me-2"></i>Refresh Resources
+        </a>
+      </div>
+    </div>
+
+    <!-- Azure Resources Section -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Azure Resources</h2>
+      </div>
+      <div class="card-body">
+        {% if grouped_resources %}
+          {% for resource_type, resources in grouped_resources.items %}
+            <h3 class="h6 fw-bold mb-3">{{ resource_type }}</h3>
+            <div class="row g-3 mb-4">
+              {% for resource in resources %}
+                <div class="col-12 col-md-6 col-xl-4">
+                  <div class="card h-100 border">
+                    <div class="card-body">
+                      <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h4 class="h6 fw-medium text-break mb-0">
+                          {{ resource.resource_name|default:resource.resource_id }}
+                        </h4>
+                        <div>
+                          {% for tag in resource.tags.all %}
+                            <span class="badge bg-info" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#editTagModal-{{ resource.id }}-{{ tag.id }}">
+                              {{ tag.name }}
+                            </span>
+                          {% empty %}
+                            <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addTagModal-{{ resource.id }}">
+                              <i class="fas fa-tag"></i>
+                            </button>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      <p class="text-muted small mb-2">Resource Group: {{ resource.resource_group }}</p>
+                      <p class="text-muted small mb-3">Location: {{ resource.location }}</p>
+                      <a href="{% url 'azure:azure_resource_details' slug=resource.slug %}" 
+                         class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-external-link-alt me-1"></i>View Details
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-center py-5">
+            <p class="text-muted mb-3">No resources found. Would you like to pull resources?</p>
+            <a href="{% url 'azure:pull_resources' subscription_id=azure_account.subscription_id %}" class="btn btn-primary">
+              <i class="fas fa-sync me-2"></i>Generate Overview
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Azure Log Sources Section -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Azure Log Sources</h2>
+      </div>
+      <div class="card-body">
+        {% for message in error_messages %}
+          <div class="alert alert-danger">{{ message }}</div>
+        {% endfor %}
+
+        {% if grouped_log_sources %}
+          {% for service_name, log_sources in grouped_log_sources.items %}
+            <h3 class="h6 fw-bold mb-3">{{ service_name }}</h3>
+            <div class="row g-3 mb-4">
+              {% for log_source in log_sources %}
+                <div class="col-12 col-md-6 col-xl-4">
+                  <div class="card h-100 border">
+                    <div class="card-body">
+                      <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h4 class="h6 fw-medium text-break mb-0">{{ log_source.log_name }}</h4>
+                        <div>
+                          {% for tag in log_source.tags.all %}
+                            <span class="badge bg-info" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#editTagModalLog-{{ log_source.id }}-{{ tag.id }}">
+                              {{ tag.name }}
+                            </span>
+                          {% empty %}
+                            <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#addTagModalLog-{{ log_source.id }}">
+                              <i class="fas fa-tag"></i>
+                            </button>
+                          {% endfor %}
+                        </div>
+                      </div>
+                      <div class="mb-3">
+                        <p class="text-muted small mb-1">Location: {{ log_source.location|default:"Global" }}</p>
+                        <p class="text-muted small mb-0">Status: {{ log_source.status }}</p>
+                      </div>
+                      <a href="{% url 'azure:azure_logsource_details' slug=log_source.slug %}" 
+                         class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-external-link-alt me-1"></i>View Details
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-center py-5">
+            <p class="text-muted mb-0">No log sources found.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tag Modals -->
+<!-- Add Tag Modals -->
+{% for resource_type, resources in grouped_resources.items %}
+  {% for resource in resources %}
+    <div class="modal fade" id="addTagModal-{{ resource.id }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Add Tag to Resource</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form action="{% url 'azure:add_tag_to_resource' resource.id %}" method="post">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label class="form-label">Select Tag</label>
+                <select name="tag_id" class="form-select">
+                  {% for tag in all_tags %}
+                    <option value="{{ tag.id }}">{{ tag.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary">Add Tag</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+{% endfor %}
+
+<!-- Log Source Tag Modals -->
+{% for service_name, log_sources in grouped_log_sources.items %}
+  {% for log_source in log_sources %}
+    <div class="modal fade" id="addTagModalLog-{{ log_source.id }}" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Add Tag to Log Source</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form action="{% url 'azure:add_tag_to_logsource' log_source.id %}" method="post">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label class="form-label">Select Tag</label>
+                <select name="tag_id" class="form-select">
+                  {% for tag in all_tags %}
+                    <option value="{{ tag.id }}">{{ tag.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary">Add Tag</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+{% endfor %}
+
+<!-- Edit Tag Modals -->
+{% for resource_type, resources in grouped_resources.items %}
+  {% for resource in resources %}
+    {% for tag in resource.tags.all %}
+      <div class="modal fade" id="editTagModal-{{ resource.id }}-{{ tag.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Edit Resource Tag</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <form action="{% url 'azure:edit_resource_tag' resource.id tag.id %}" method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label">Select New Tag</label>
+                  <select name="new_tag_id" class="form-select">
+                    {% for available_tag in all_tags %}
+                      <option value="{{ available_tag.id }}" {% if available_tag.id == tag.id %}selected{% endif %}>
+                        {{ available_tag.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <button type="submit" class="btn btn-primary">Update Tag</button>
+                  <button type="submit" class="btn btn-danger" formaction="{% url 'azure:remove_tag_from_resource' resource.id tag.id %}">
+                    Remove Tag
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+{% endfor %}
+
+<!-- Log Source Tag Edit Modals -->
+{% for service_name, log_sources in grouped_log_sources.items %}
+  {% for log_source in log_sources %}
+    {% for tag in log_source.tags.all %}
+      <div class="modal fade" id="editTagModalLog-{{ log_source.id }}-{{ tag.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Edit Log Source Tag</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <form action="{% url 'azure:edit_logsource_tag' log_source.id tag.id %}" method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label">Select New Tag</label>
+                  <select name="new_tag_id" class="form-select">
+                    {% for available_tag in all_tags %}
+                      <option value="{{ available_tag.id }}" {% if available_tag.id == tag.id %}selected{% endif %}>
+                        {{ available_tag.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="d-flex justify-content-between">
+                  <button type="submit" class="btn btn-primary">Update Tag</button>
+                  <button type="submit" class="btn btn-danger" formaction="{% url 'azure:remove_tag_from_logsource' log_source.id tag.id %}">
+                    Remove Tag
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+{% endfor %}
+
+{% endblock %}

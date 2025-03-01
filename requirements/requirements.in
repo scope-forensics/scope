@@ -1,4 +1,3 @@
-boto3
 Django
 django-allauth[socialaccount,mfa]
 django-htmx
@@ -10,7 +9,7 @@ djangorestframework
 djangorestframework-api-key
 django-health-check
 drf-spectacular
-django-anymail[mailgun]  # email services
+django-anymail[mailgun]
 django-storages
 celery-progress
 celery
@@ -18,3 +17,21 @@ celery[redis]
 django-celery-beat
 psycopg2-binary
 whitenoise[brotli]
+
+#AWS
+boto3
+
+#Azure
+azure-identity
+azure-mgmt-resource
+azure-mgmt-monitor
+azure-mgmt-loganalytics
+azure-graphrbac
+msrestazure
+
+#GCP
+google-cloud-resource-manager
+google-cloud-storage
+google-cloud-logging
+google-cloud-compute
+google-auth

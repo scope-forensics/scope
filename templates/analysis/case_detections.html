@@ -59,6 +59,34 @@
       </div>
     </div>
 
+    <!-- Add this after the Stats Summary Card and before the Detection Results -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Filters</h2>
+      </div>
+      <div class="card-body">
+        <form method="get" class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label fw-medium">Account</label>
+            <select name="account" class="form-select">
+              <option value="">All Accounts</option>
+              {% for account in accounts %}
+                <option value="{{ account.id }}" 
+                        {% if selected_account == account.id %}selected{% endif %}>
+                  {{ account.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-filter me-2"></i>Apply Filter
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Detection Results -->
     {% if results_by_detection %}
       {% for detection, results in results_by_detection.items %}

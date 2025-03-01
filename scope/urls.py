@@ -38,12 +38,11 @@ urlpatterns = [
     path("", include("apps.web.urls")),
     path("case/", include("apps.case.urls")),
     path("aws/", include("apps.aws.urls")),
+    path("azure/", include("apps.azure.urls")),
     path("data/", include("apps.data.urls")),
     path("analysis/", include("apps.analysis.urls")),
+    path("gcp/", include("apps.gcp.urls")),
     path("celery-progress/", include("celery_progress.urls")),
     # API docs
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
-    # Optional UI - you may wish to remove one of these depending on your preference
-    path("api/schema/swagger-ui/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
-    path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

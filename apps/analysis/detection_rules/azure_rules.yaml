@@ -1,0 +1,52 @@
+# Azure Pre-built Detection Rules
+
+- name: "Azure Sign-in from Unknown Location"
+  description: "Detects sign-in attempts from unusual or unauthorized locations"
+  cloud: "azure"
+  detection_type: "login"
+  severity: "medium"
+  event_source: "Microsoft.Azure.ActiveDirectory"
+  event_name: "Sign-in activity"
+  additional_criteria: {"raw_data_contains": "unfamiliarFeatures"}
+  auto_tags: ["Suspicious", "Medium"]
+  enabled: true
+
+- name: "Azure Role Assignment Change"
+  description: "Detects changes to role assignments which could indicate privilege escalation"
+  cloud: "azure"
+  detection_type: "iam"
+  severity: "high"
+  event_source: "Microsoft.Authorization"
+  event_name: "Microsoft.Authorization/roleAssignments/write"
+  auto_tags: ["High", "Suspicious"]
+  enabled: true
+
+- name: "Network Security Group Modification"
+  description: "Detects modifications to NSGs which could indicate network security changes"
+  cloud: "azure"
+  detection_type: "network"
+  severity: "medium"
+  event_source: "Microsoft.Network"
+  event_name: "Microsoft.Network/networkSecurityGroups/write"
+  auto_tags: ["Medium", "Informational"]
+  enabled: true
+
+- name: "Key Vault Access Policy Change"
+  description: "Detects modifications to Key Vault access policies which could indicate unauthorized access attempts"
+  cloud: "azure"
+  detection_type: "keyvault"
+  severity: "high"
+  event_source: "Microsoft.KeyVault"
+  event_name: "Microsoft.KeyVault/vaults/accessPolicies/write"
+  auto_tags: ["High", "Suspicious"]
+  enabled: true
+
+- name: "Storage Account Configuration Change"
+  description: "Detects changes to storage account configurations which could indicate data exfiltration risks"
+  cloud: "azure"
+  detection_type: "storage"
+  severity: "medium"
+  event_source: "Microsoft.Storage"
+  event_name: "Microsoft.Storage/storageAccounts/write"
+  auto_tags: ["Medium", "Informational"]
+  enabled: true 

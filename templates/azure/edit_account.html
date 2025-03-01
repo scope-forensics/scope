@@ -1,0 +1,75 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load static %}
+{% block app %}
+
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Edit Azure Account</h1>
+        <p class="text-muted mb-0">Subscription: {{ account.subscription_id }}</p>
+      </div>
+      <a href="{% url 'case:case_detail' slug=account.case.slug %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Case
+      </a>
+    </div>
+
+    <!-- Edit Form Card -->
+    <div class="card shadow-sm">
+      <div class="card-body p-4">
+        <form method="POST">
+          {% csrf_token %}
+          
+          {% for field in form %}
+            <div class="mb-4">
+              <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                {{ field.label }}
+              </label>
+              {{ field }}
+              {% if field.help_text %}
+                <div class="form-text">{{ field.help_text }}</div>
+              {% endif %}
+              {% if field.errors %}
+                {% for error in field.errors %}
+                  <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+              {% endif %}
+            </div>
+          {% endfor %}
+
+          <div class="d-flex justify-content-end gap-2">
+            <a href="{% url 'case:case_detail' slug=account.case.slug %}" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save me-2"></i>Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Help Card -->
+    <div class="card shadow-sm mt-4">
+      <div class="card-body">
+        <h5 class="card-title">Need to update credentials?</h5>
+        <ol class="mb-3">
+          <li>Go to Azure Active Directory → App registrations → Your app</li>
+          <li>Find the Application (client) ID and Directory (tenant) ID in Overview</li>
+          <li>To create a new client secret:
+            <ul>
+              <li>Go to Certificates & secrets</li>
+              <li>Click "New client secret"</li>
+              <li>Copy the secret value immediately (it won't be shown again)</li>
+            </ul>
+          </li>
+        </ol>
+        <div class="alert alert-warning">
+          <i class="fas fa-exclamation-triangle me-2"></i>Remember to update any role assignments if you create a new app registration.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

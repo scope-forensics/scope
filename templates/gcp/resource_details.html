@@ -1,0 +1,86 @@
+{% extends "web/app/app_base.html" %}
+{% load i18n %}
+{% load static %}
+{% block app %}
+<section class="app-section py-4">
+  <div class="container">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-0">Resource Details</h1>
+        <p class="text-muted mb-0">{{ resource.resource_name|default:resource.resource_id }}</p>
+      </div>
+      <a href="{% url 'gcp:account_resources' project_id=account.project_id %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-2"></i>Back to Project
+      </a>
+    </div>
+
+    <!-- Basic Information -->
+    <div class="card shadow-sm mb-4">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Basic Information</h2>
+      </div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          <dt class="col-sm-3">Resource Type</dt>
+          <dd class="col-sm-9">{{ resource.resource_type }}</dd>
+
+          <dt class="col-sm-3">Resource ID</dt>
+          <dd class="col-sm-9">
+            <code class="text-break">{{ resource.resource_id }}</code>
+          </dd>
+
+          <dt class="col-sm-3">Location</dt>
+          <dd class="col-sm-9">{{ resource.location|default:"Global" }}</dd>
+
+          <dt class="col-sm-3">Discovered</dt>
+          <dd class="col-sm-9">{{ resource.discovered_at|date:"M d, Y H:i" }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Resource Details -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-transparent">
+        <h2 class="h5 mb-0">Resource Details</h2>
+      </div>
+      <div class="card-body">
+        {% if resource.resource_details %}
+          {% for key, value in resource.resource_details.items %}
+            <div class="mb-3">
+              <h3 class="h6 fw-medium mb-2">{{ key }}</h3>
+              {% if value is iterable and value.items %}
+                <!-- Handle Nested Dictionary -->
+                <dl class="row mb-0 ms-3">
+                  {% for nested_key, nested_value in value.items %}
+                    <dt class="col-sm-3">{{ nested_key }}</dt>
+                    <dd class="col-sm-9">
+                      {% if nested_value is iterable and nested_value.items %}
+                        <!-- Handle Double-Nested Dictionary -->
+                        <dl class="row mb-0">
+                          {% for sub_key, sub_value in nested_value.items %}
+                            <dt class="col-sm-4">{{ sub_key }}</dt>
+                            <dd class="col-sm-8">{{ sub_value }}</dd>
+                          {% endfor %}
+                        </dl>
+                      {% else %}
+                        {{ nested_value }}
+                      {% endif %}
+                    </dd>
+                  {% endfor %}
+                </dl>
+              {% elif value is iterable and value|length > 50 %}
+                <pre class="bg-light p-3 rounded"><code>{{ value }}</code></pre>
+              {% else %}
+                <p class="text-muted mb-0">{{ value }}</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">No additional details available for this resource.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %} 

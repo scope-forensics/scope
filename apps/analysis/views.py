@@ -11,6 +11,7 @@ from django.core.management import call_command
 from io import StringIO
 from apps.aws.models import AWSAccount
 from .models import Tag
+from apps.azure.models import AzureAccount
 
 @login_required
 def detection_list(request, case_id):
@@ -115,28 +116,60 @@ def detection_results(request, case_id):
 
 @login_required
 def case_detections(request, case_id):
-    """Main detections page showing results and management options"""
     case = get_object_or_404(Case, id=case_id)
-    detection_results = DetectionResult.objects.filter(
-        case_id=case_id
-    ).select_related('detection', 'matched_log').order_by('-created_at')
     
-    # Get all available tags
-    available_tags = Tag.objects.all()
+    # Get account filter from query params
+    account_filter = request.GET.get('account')
+    
+    # Get all detection results for the case
+    results = DetectionResult.objects.filter(case=case)
+    
+    # Filter by account if specified
+    if account_filter:
+        account_type, account_id = account_filter.split(':')
+        if account_type == 'aws':
+            results = results.filter(matched_log__aws_account__account_id=account_id)
+        elif account_type == 'azure':
+            results = results.filter(matched_log__azure_account__subscription_id=account_id)
+    
+    # Get unique accounts that have logs
+    accounts = []
+    aws_accounts = AWSAccount.objects.filter(
+        normalized_logs__detectionresult__case=case
+    ).distinct()
+    azure_accounts = AzureAccount.objects.filter(
+        normalized_logs__detectionresult__case=case
+    ).distinct()
+    
+    for aws_acc in aws_accounts:
+        accounts.append({
+            'id': f'aws:{aws_acc.account_id}',
+            'name': f'AWS Account: {aws_acc.account_id}',
+            'type': 'aws'
+        })
+    
+    for azure_acc in azure_accounts:
+        accounts.append({
+            'id': f'azure:{azure_acc.subscription_id}',
+            'name': f'Azure Account: {azure_acc.subscription_id}',
+            'type': 'azure'
+        })
     
     # Group results by detection
     results_by_detection = {}
-    for result in detection_results:
+    for result in results:
         if result.detection not in results_by_detection:
             results_by_detection[result.detection] = []
         results_by_detection[result.detection].append(result)
-
+    
     context = {
         'case': case,
         'results_by_detection': results_by_detection,
-        'total_results': detection_results.count(),
-        'detection_count': Detection.objects.filter(enabled=True).count(),
-        'available_tags': available_tags
+        'detection_count': Detection.objects.count(),
+        'total_results': results.count(),
+        'available_tags': Tag.objects.all(),
+        'accounts': accounts,
+        'selected_account': account_filter
     }
     
     return render(request, 'analysis/case_detections.html', context)
