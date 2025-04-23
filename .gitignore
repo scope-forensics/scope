@@ -174,3 +174,6 @@ aws.credentials
 *.csv
 *.json
 *.json.gz
+
+# Don't ignore GitHub workflows
+!.github/workflows/
