@@ -1,6 +1,6 @@
 # Scope - Cloud Forensics Tool
 
-Scope is a powerful Python package for collecting and analyzing cloud logs for forensic investigations. It currently supports AWS CloudTrail logs with plans to extend to Azure and GCP in the future.
+Scope is an open source tool for collecting and analyzing cloud logs for forensic investigations. Scope currently supports AWS CloudTrail logs with plans to extend to Azure and GCP in the future.
 
 ## Features
 
