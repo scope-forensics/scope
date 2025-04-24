@@ -27,7 +27,6 @@ dependencies = [
 [project.scripts]
 scope = "scope.cli:main"
 
-# Add this section to ensure the package is properly installed
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["scope", "scope.aws", "scope.common"] 
