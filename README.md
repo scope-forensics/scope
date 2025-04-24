@@ -14,7 +14,7 @@ Scope is an open source tool for collecting and analyzing cloud logs for forensi
 ### Using pip (Recommended)
 
 ```bash
-pip install scope
+pip install scope-forensics
 ```
 
 ### From Source
@@ -218,6 +218,4 @@ This command will:
 
 ### Exporting Timelines
 
-By default, Scope exports timelines to the specified output file. You can specify different formats:
-
-```
+By default, Scope exports timelines to the specified output file. You can specify betwen csv and json formats.
