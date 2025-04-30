@@ -72,6 +72,22 @@ def parse_args():
     explore_parser = aws_subparsers.add_parser('explore-bucket', help='Explore S3 bucket structure')
     explore_parser.add_argument('--bucket', required=True, help='S3 bucket name')
     
+    # Resource discovery
+    resource_parser = aws_subparsers.add_parser('discover-resources', help='Discover AWS resources')
+    resource_parser.add_argument('--resource-types', nargs='+', 
+                                choices=['ec2', 's3', 'iam_users', 'iam_roles', 'lambda', 'rds', 'all'],
+                                default=['all'], help='Resource types to discover')
+    resource_parser.add_argument('--regions', nargs='+', help='Specific regions to search (space-separated)')
+    resource_parser.add_argument('--output-file', help='Output file path')
+    resource_parser.add_argument('--format', choices=['json', 'csv', 'terminal'], default='terminal', 
+                                help='Output format')
+
+    # Credential report
+    cred_report_parser = aws_subparsers.add_parser('credential-report', help='Generate and retrieve IAM credential report')
+    cred_report_parser.add_argument('--output-file', help='Output file path')
+    cred_report_parser.add_argument('--format', choices=['json', 'csv', 'terminal'], default='terminal',
+                                   help='Output format')
+    
     return parser.parse_args()
 
 def main():
@@ -271,6 +287,35 @@ def handle_aws_commands(args):
                 logger.info("\nNo CloudTrail paths automatically detected.")
                 logger.info("If you know the path, use:")
                 logger.info(f"  scope aws s3 --bucket {args.bucket} --prefix YOUR_PREFIX --output-file timeline.csv")
+
+    elif args.operation == 'discover-resources':
+        # Handle 'all' resource type
+        if 'all' in args.resource_types:
+            resource_types = None  # None means all supported types
+        else:
+            resource_types = args.resource_types
+            
+        # Discover resources
+        resources = collector.discover_resources(
+            resource_types=resource_types,
+            regions=args.regions,
+            output_format=args.format,
+            output_file=args.output_file
+        )
+        
+        logger.info(f"Resource discovery completed")
+        
+    elif args.operation == 'credential-report':
+        # Generate and retrieve credential report
+        report = collector.get_credential_report(
+            output_format=args.format,
+            output_file=args.output_file
+        )
+        
+        if report:
+            logger.info(f"Credential report retrieved successfully")
+        else:
+            logger.error("Failed to retrieve credential report")
 
 def configure_aws_credentials(args):
     """

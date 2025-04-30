@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scope-forensics"
-version = "0.1.3"
-description = "Scope is an Open Source Cloud Forensics tool for AWS. Scope can rapidly obtain logs and create super timelines for analysis."
+version = "1.0.0"
+description = "Scope is an Open Source Cloud Forensics tool for AWS. Scope can rapidly obtain logs, discover resources, and create super timelines for analysis."
 readme = "README.md"
 authors = [
     {name = "Scope", email = "scopeforensics@protonmail.com"},
@@ -27,7 +27,6 @@ dependencies = [
 [project.scripts]
 scope = "scope.cli:main"
 
-# Add this section to ensure the package is properly installed
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["scope", "scope.aws", "scope.common"] 

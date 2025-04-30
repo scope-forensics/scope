@@ -1,13 +1,14 @@
 # Scope - Cloud Forensics Tool
 
-Scope is an open source tool for collecting and analyzing cloud logs for forensic investigations. Scope currently supports AWS CloudTrail logs with plans to extend to Azure and GCP in the future.
+Scope is an Open Source Cloud Forensics tool for AWS. Scope can rapidly obtain logs, discover resources, and create super timelines for analysis.
 
 ## Features
 
 - **AWS CloudTrail Collection**: Retrieve logs from S3 buckets or via the Management Events API
 - **Normalized Timeline**: Convert cloud logs into a standardized timeline format
 - **Multiple Export Formats**: Export timelines as CSV or JSON
-- **Resource Discovery**: Identify available CloudTrail trails in your AWS account
+- **Resource Discovery**: Identify available CloudTrail trails and AWS resources in your account
+- **Credential Reports**: Generate and analyze IAM credential reports for security assessment
 
 ## Installation
 
@@ -97,7 +98,14 @@ To use Scope effectively, you'll need an AWS user with appropriate permissions. 
                    "cloudtrail:DescribeTrails",
                    "s3:GetObject",
                    "s3:ListBucket",
-                   "s3:GetBucketLocation"
+                   "s3:GetBucketLocation",
+                   "ec2:DescribeInstances",
+                   "iam:ListUsers",
+                   "iam:ListRoles",
+                   "iam:GenerateCredentialReport",
+                   "iam:GetCredentialReport",
+                   "lambda:ListFunctions",
+                   "rds:DescribeDBInstances"
                ],
                "Resource": "*"
            }
@@ -131,6 +139,24 @@ scope aws discover
 
 This command will display information about each trail, including its name, S3 bucket location, and whether it logs management events.
 
+### Discover AWS Resources
+
+To discover various AWS resources in your account (EC2, S3, IAM, Lambda, RDS):
+
+```bash
+# Discover all supported resource types
+scope aws discover-resources
+
+# Discover specific resource types
+scope aws discover-resources --resource-types ec2 s3 --format json --output-file resources.json
+```
+
+Available parameters:
+- `--resource-types`: Types of resources to discover (choices: ec2, s3, iam_users, iam_roles, lambda, rds, all)
+- `--regions`: Specific AWS regions to search (space-separated)
+- `--output-file`: Path to save the output
+- `--format`: Output format (choices: json, csv, terminal)
+
 ### Explore S3 Bucket Structure
 
 To explore the structure of an S3 bucket and automatically detect CloudTrail logs:
@@ -143,6 +169,49 @@ This command will:
 1. List top-level prefixes in the bucket
 2. Automatically detect potential CloudTrail log paths
 3. Provide a ready-to-use command for collecting logs from the detected paths
+
+### Discover AWS Resources
+
+To discover AWS resources in your account:
+
+```bash
+# Discover all supported resource types
+scope aws discover-resources
+
+# Discover specific resource types
+scope aws discover-resources --resource-types lambda rds --regions us-east-1 us-west-2
+```
+
+Available parameters:
+- `--resource-types`: Types of resources to discover (choices: ec2, s3, iam_users, iam_roles, lambda, rds, all)
+- `--regions`: Specific AWS regions to search (space-separated)
+- `--output-file`: Path to save the output
+- `--format`: Output format (choices: json, csv, terminal)
+
+### Generate IAM Credential Report
+
+To generate and retrieve an IAM credential report:
+
+```bash
+# Display credential report in terminal
+scope aws credential-report
+
+# Save credential report as CSV
+scope aws credential-report --format csv --output-file credentials.csv
+
+# Save credential report as JSON
+scope aws credential-report --format json --output-file credentials.json
+```
+
+Available parameters:
+- `--output-file`: Path to save the output
+- `--format`: Output format (choices: json, csv, terminal)
+
+The credential report includes details about IAM users such as:
+- Password and access key usage
+- MFA status
+- Access key rotation dates
+- Last activity timestamps
 
 ### Collect Management Events
 
