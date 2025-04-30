@@ -488,4 +488,359 @@ class AWSLogCollector:
             logger.debug(f"Yielding final batch of {len(current_batch)} events")
             yield current_batch
         
-        logger.info(f"Processed {processed_files} files containing {total_events} CloudTrail events") 
+        logger.info(f"Processed {processed_files} files containing {total_events} CloudTrail events")
+
+    def discover_resources(self, resource_types=None, regions=None, output_format='json', output_file=None):
+        """
+        Discover AWS resources across specified regions.
+        
+        Args:
+            resource_types (list, optional): List of resource types to discover. 
+                Supported types: 'ec2', 's3', 'iam_users', 'iam_roles', 'lambda', 'rds'.
+                If None, discovers all supported resource types.
+            regions (list, optional): List of AWS regions to search. If None, searches all available regions.
+            output_format (str, optional): Output format - 'json', 'csv', or 'terminal'. Defaults to 'json'.
+            output_file (str, optional): Path to output file. If None, prints to terminal.
+            
+        Returns:
+            dict: Dictionary of discovered resources by type
+        """
+        # Default resource types if none specified
+        if not resource_types:
+            resource_types = ['ec2', 's3', 'iam_users', 'iam_roles', 'lambda', 'rds']
+        
+        logger.info(f"Discovering AWS resources: {', '.join(resource_types)}")
+        
+        # Initialize results dictionary
+        resources = {resource_type: [] for resource_type in resource_types}
+        
+        # Helper function to serialize datetime objects for JSON output
+        def serialize_resource_details(resource):
+            if isinstance(resource, dict):
+                return {key: serialize_resource_details(value) for key, value in resource.items()}
+            elif isinstance(resource, list):
+                return [serialize_resource_details(item) for item in resource]
+            elif isinstance(resource, datetime):
+                return resource.isoformat()
+            else:
+                return resource
+        
+        # Helper function to discover resources by region
+        def discover_by_region(service_name, fetch_function):
+            try:
+                # If regions not specified, get all available regions for the service
+                if not regions:
+                    available_regions = self.session.get_available_regions(service_name)
+                else:
+                    available_regions = regions
+                    
+                for region in available_regions:
+                    try:
+                        client = self.session.client(service_name, region_name=region)
+                        logger.info(f"Discovering {service_name} resources in region {region}...")
+                        for resource in fetch_function(client, region):
+                            yield resource
+                    except Exception as e:
+                        logger.error(f"Error discovering {service_name} resources in {region}: {str(e)}")
+                        continue
+            except Exception as e:
+                logger.error(f"Failed to fetch regions for {service_name}: {str(e)}")
+        
+        # EC2 instances
+        if 'ec2' in resource_types:
+            def fetch_ec2_instances(client, region):
+                try:
+                    paginator = client.get_paginator('describe_instances')
+                    for page in paginator.paginate():
+                        for reservation in page.get('Reservations', []):
+                            for instance in reservation.get('Instances', []):
+                                resource_region = instance.get('Placement', {}).get('AvailabilityZone', region)[:-1]
+                                
+                                # Get instance name from tags
+                                instance_name = None
+                                for tag in instance.get('Tags', []):
+                                    if tag.get('Key') == 'Name':
+                                        instance_name = tag.get('Value')
+                                        break
+                                
+                                yield {
+                                    'resource_id': instance.get('InstanceId'),
+                                    'resource_type': 'EC2',
+                                    'resource_name': instance_name or instance.get('InstanceId'),
+                                    'resource_details': serialize_resource_details(instance),
+                                    'aws_region': resource_region,
+                                }
+                except Exception as e:
+                    logger.error(f"Error fetching EC2 instances in {region}: {str(e)}")
+            
+            for resource in discover_by_region('ec2', fetch_ec2_instances):
+                resources['ec2'].append(resource)
+        
+        # S3 buckets (global service)
+        if 's3' in resource_types:
+            try:
+                s3 = self.session.client('s3')
+                buckets = s3.list_buckets()
+                
+                for bucket in buckets.get('Buckets', []):
+                    bucket_name = bucket.get('Name')
+                    try:
+                        # Get bucket location
+                        location = s3.get_bucket_location(Bucket=bucket_name)
+                        bucket_region = location.get('LocationConstraint') or 'us-east-1'
+                        
+                        resource = {
+                            'resource_id': bucket_name,
+                            'resource_type': 'S3',
+                            'resource_name': bucket_name,
+                            'resource_details': serialize_resource_details(bucket),
+                            'aws_region': bucket_region,
+                        }
+                        resources['s3'].append(resource)
+                    except Exception as e:
+                        logger.error(f"Error getting location for bucket {bucket_name}: {str(e)}")
+            except Exception as e:
+                logger.error(f"Error listing S3 buckets: {str(e)}")
+        
+        # IAM users (global service)
+        if 'iam_users' in resource_types:
+            try:
+                iam = self.session.client('iam')
+                paginator = iam.get_paginator('list_users')
+                
+                for page in paginator.paginate():
+                    for user in page.get('Users', []):
+                        resource = {
+                            'resource_id': user.get('UserId'),
+                            'resource_type': 'IAM User',
+                            'resource_name': user.get('UserName'),
+                            'resource_details': serialize_resource_details(user),
+                            'aws_region': 'global',
+                        }
+                        resources['iam_users'].append(resource)
+            except Exception as e:
+                logger.error(f"Error listing IAM users: {str(e)}")
+        
+        # IAM roles (global service)
+        if 'iam_roles' in resource_types:
+            try:
+                iam = self.session.client('iam')
+                paginator = iam.get_paginator('list_roles')
+                
+                for page in paginator.paginate():
+                    for role in page.get('Roles', []):
+                        resource = {
+                            'resource_id': role.get('RoleId'),
+                            'resource_type': 'IAM Role',
+                            'resource_name': role.get('RoleName'),
+                            'resource_details': serialize_resource_details(role),
+                            'aws_region': 'global',
+                        }
+                        resources['iam_roles'].append(resource)
+            except Exception as e:
+                logger.error(f"Error listing IAM roles: {str(e)}")
+        
+        # Lambda functions
+        if 'lambda' in resource_types:
+            def fetch_lambda_functions(client, region):
+                try:
+                    paginator = client.get_paginator('list_functions')
+                    for page in paginator.paginate():
+                        for function in page.get('Functions', []):
+                            yield {
+                                'resource_id': function.get('FunctionArn'),
+                                'resource_type': 'Lambda Function',
+                                'resource_name': function.get('FunctionName'),
+                                'resource_details': serialize_resource_details(function),
+                                'aws_region': region,
+                            }
+                except Exception as e:
+                    logger.error(f"Error fetching Lambda functions in {region}: {str(e)}")
+            
+            for resource in discover_by_region('lambda', fetch_lambda_functions):
+                resources['lambda'].append(resource)
+        
+        # RDS instances
+        if 'rds' in resource_types:
+            def fetch_rds_instances(client, region):
+                try:
+                    paginator = client.get_paginator('describe_db_instances')
+                    for page in paginator.paginate():
+                        for instance in page.get('DBInstances', []):
+                            yield {
+                                'resource_id': instance.get('DBInstanceIdentifier'),
+                                'resource_type': 'RDS',
+                                'resource_name': instance.get('DBInstanceIdentifier'),
+                                'resource_details': serialize_resource_details(instance),
+                                'aws_region': region,
+                            }
+                except Exception as e:
+                    logger.error(f"Error fetching RDS instances in {region}: {str(e)}")
+            
+            for resource in discover_by_region('rds', fetch_rds_instances):
+                resources['rds'].append(resource)
+        
+        # Output the results
+        total_resources = sum(len(resources[resource_type]) for resource_type in resources)
+        logger.info(f"Discovered {total_resources} resources across {len(resource_types)} resource types")
+        
+        # Format and output the results
+        if output_format == 'json':
+            output_data = json.dumps(resources, indent=2)
+        elif output_format == 'csv':
+            import csv
+            import io
+            
+            output = io.StringIO()
+            fieldnames = ['resource_type', 'resource_id', 'resource_name', 'aws_region']
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            
+            for resource_type, resource_list in resources.items():
+                for resource in resource_list:
+                    writer.writerow({
+                        'resource_type': resource['resource_type'],
+                        'resource_id': resource['resource_id'],
+                        'resource_name': resource['resource_name'],
+                        'aws_region': resource['aws_region'] or 'global'
+                    })
+            
+            output_data = output.getvalue()
+        else:  # terminal output
+            output_lines = []
+            output_lines.append("AWS Resource Discovery Results:")
+            output_lines.append("=" * 80)
+            
+            for resource_type, resource_list in resources.items():
+                if resource_list:
+                    output_lines.append(f"\n{resource_type.upper()} Resources ({len(resource_list)}):")
+                    output_lines.append("-" * 80)
+                    
+                    for resource in resource_list:
+                        region_str = f" ({resource['aws_region']})" if resource['aws_region'] else " (global)"
+                        output_lines.append(f"{resource['resource_name']} - {resource['resource_id']}{region_str}")
+            
+            output_data = "\n".join(output_lines)
+        
+        # Output to file or terminal
+        if output_file:
+            with open(output_file, 'w') as f:
+                f.write(output_data)
+            logger.info(f"Resource discovery results written to {output_file}")
+        else:
+            print(output_data)
+        
+        return resources
+
+    def get_credential_report(self, output_format='json', output_file=None):
+        """
+        Generate and retrieve the IAM credential report.
+        
+        Args:
+            output_format (str, optional): Output format - 'json', 'csv', or 'terminal'. Defaults to 'json'.
+            output_file (str, optional): Path to output file. If None, prints to terminal.
+            
+        Returns:
+            dict or str: Credential report data in the specified format
+        """
+        logger.info("Generating IAM credential report")
+        
+        try:
+            iam = self.session.client('iam')
+            
+            # Generate credential report
+            response = iam.generate_credential_report()
+            logger.info(f"Credential report generation status: {response.get('State')}")
+            
+            # Wait for report to be generated with timeout
+            max_attempts = 10
+            attempt = 0
+            
+            while attempt < max_attempts:
+                try:
+                    response = iam.get_credential_report()
+                    if response.get('Content'):
+                        break
+                except Exception as e:
+                    if 'ReportNotPresent' in str(e) or 'ReportInProgress' in str(e):
+                        logger.info(f"Report not ready yet, attempt {attempt + 1}/{max_attempts}")
+                        attempt += 1
+                        import time
+                        time.sleep(2)
+                        continue
+                    else:
+                        raise
+                
+            if attempt >= max_attempts:
+                logger.error("Timed out waiting for credential report")
+                return None
+            
+            # Get and process the credential report
+            report_csv = response['Content'].decode('utf-8')
+            
+            # Parse CSV content
+            import csv
+            from io import StringIO
+            
+            csv_reader = csv.DictReader(StringIO(report_csv))
+            report_data = list(csv_reader)
+            
+            # Convert boolean strings to actual booleans and dates to datetime objects
+            for user_data in report_data:
+                for key, value in user_data.items():
+                    if value.lower() in ('true', 'false'):
+                        user_data[key] = value.lower() == 'true'
+                    elif 'date' in key.lower() or 'time' in key.lower() or 'last_used' in key.lower() or 'last_rotated' in key.lower():
+                        if value and value not in ('N/A', 'not_supported', 'no_information'):
+                            try:
+                                user_data[key] = datetime.strptime(value, '%Y-%m-%dT%H:%M:%S+00:00')
+                            except ValueError:
+                                try:
+                                    user_data[key] = datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ')
+                                except ValueError:
+                                    pass  # Keep as string if parsing fails
+            
+            logger.info(f"Successfully retrieved credential report for {len(report_data)} users")
+            
+            # Format and output the results
+            if output_format == 'json':
+                # Convert datetime objects to strings for JSON serialization
+                for user_data in report_data:
+                    for key, value in user_data.items():
+                        if isinstance(value, datetime):
+                            user_data[key] = value.isoformat()
+                
+                output_data = json.dumps(report_data, indent=2)
+            elif output_format == 'csv':
+                # Return the original CSV
+                output_data = report_csv
+            else:  # terminal output
+                output_lines = []
+                output_lines.append("AWS IAM Credential Report:")
+                output_lines.append("=" * 80)
+                
+                for user_data in report_data:
+                    output_lines.append(f"\nUser: {user_data.get('user')}")
+                    output_lines.append("-" * 80)
+                    
+                    for key, value in user_data.items():
+                        if key != 'user':  # Skip user since we already displayed it
+                            if isinstance(value, datetime):
+                                value = value.isoformat()
+                            output_lines.append(f"{key}: {value}")
+                
+                output_data = "\n".join(output_lines)
+            
+            # Output to file or terminal
+            if output_file:
+                with open(output_file, 'w') as f:
+                    f.write(output_data)
+                logger.info(f"Credential report written to {output_file}")
+            else:
+                print(output_data)
+            
+            return report_data
+            
+        except Exception as e:
+            logger.error(f"Error generating credential report: {str(e)}")
+            return None 

@@ -135,3 +135,158 @@ class CloudTrailParser:
                 continue
                 
         return normalized_events 
+
+    @staticmethod
+    def parse_resource_data(resource_data):
+        """
+        Parse AWS resource data into a standardized format.
+        
+        Args:
+            resource_data (dict): Raw AWS resource data
+            
+        Returns:
+            dict: Standardized resource data
+        """
+        # Extract common fields
+        resource_id = resource_data.get('resource_id', 'unknown')
+        resource_type = resource_data.get('resource_type', 'unknown')
+        resource_name = resource_data.get('resource_name', resource_id)
+        aws_region = resource_data.get('aws_region', 'unknown')
+        
+        # Extract resource-specific details
+        details = resource_data.get('resource_details', {})
+        
+        # Create standardized resource object
+        standardized_resource = {
+            'id': resource_id,
+            'type': resource_type,
+            'name': resource_name,
+            'region': aws_region,
+            'creation_date': None,
+            'tags': {},
+            'details': {}
+        }
+        
+        # Extract creation date if available
+        if 'LaunchTime' in details:
+            standardized_resource['creation_date'] = details['LaunchTime']
+        elif 'CreationDate' in details:
+            standardized_resource['creation_date'] = details['CreationDate']
+        elif 'CreateTime' in details:
+            standardized_resource['creation_date'] = details['CreateTime']
+        
+        # Extract tags if available
+        if 'Tags' in details and isinstance(details['Tags'], list):
+            for tag in details['Tags']:
+                if 'Key' in tag and 'Value' in tag:
+                    standardized_resource['tags'][tag['Key']] = tag['Value']
+        
+        # Add resource-specific details
+        if resource_type == 'EC2':
+            standardized_resource['details'] = {
+                'instance_type': details.get('InstanceType'),
+                'state': details.get('State', {}).get('Name'),
+                'private_ip': details.get('PrivateIpAddress'),
+                'public_ip': details.get('PublicIpAddress'),
+                'vpc_id': details.get('VpcId'),
+                'subnet_id': details.get('SubnetId'),
+                'security_groups': [sg.get('GroupName') for sg in details.get('SecurityGroups', [])]
+            }
+        elif resource_type == 'S3':
+            standardized_resource['details'] = {
+                'creation_date': details.get('CreationDate')
+            }
+        elif resource_type == 'IAM User':
+            standardized_resource['details'] = {
+                'arn': details.get('Arn'),
+                'create_date': details.get('CreateDate'),
+                'path': details.get('Path'),
+                'user_id': details.get('UserId')
+            }
+        elif resource_type == 'IAM Role':
+            standardized_resource['details'] = {
+                'arn': details.get('Arn'),
+                'create_date': details.get('CreateDate'),
+                'path': details.get('Path'),
+                'role_id': details.get('RoleId')
+            }
+        elif resource_type == 'Lambda Function':
+            standardized_resource['details'] = {
+                'runtime': details.get('Runtime'),
+                'handler': details.get('Handler'),
+                'last_modified': details.get('LastModified'),
+                'memory_size': details.get('MemorySize'),
+                'timeout': details.get('Timeout'),
+                'description': details.get('Description')
+            }
+        elif resource_type == 'RDS':
+            standardized_resource['details'] = {
+                'engine': details.get('Engine'),
+                'engine_version': details.get('EngineVersion'),
+                'status': details.get('DBInstanceStatus'),
+                'storage': details.get('AllocatedStorage'),
+                'instance_class': details.get('DBInstanceClass'),
+                'endpoint': details.get('Endpoint', {}).get('Address')
+            }
+        
+        return standardized_resource
+
+    @staticmethod
+    def parse_credential_report(report_data):
+        """
+        Parse AWS IAM credential report data.
+        
+        Args:
+            report_data (list): List of dictionaries containing credential report data
+            
+        Returns:
+            dict: Parsed credential report with user data
+        """
+        parsed_report = {
+            'report_date': datetime.now(),
+            'users': []
+        }
+        
+        for user_data in report_data:
+            parsed_user = {
+                'username': user_data.get('user'),
+                'arn': user_data.get('arn'),
+                'user_creation_time': CloudTrailParser.parse_datetime(user_data.get('user_creation_time')),
+                'password_status': {
+                    'enabled': user_data.get('password_enabled', False),
+                    'last_used': CloudTrailParser.parse_datetime(user_data.get('password_last_used')),
+                    'last_changed': CloudTrailParser.parse_datetime(user_data.get('password_last_changed')),
+                    'next_rotation': CloudTrailParser.parse_datetime(user_data.get('password_next_rotation'))
+                },
+                'mfa_active': user_data.get('mfa_active', False),
+                'access_keys': {
+                    'access_key_1': {
+                        'active': user_data.get('access_key_1_active', False),
+                        'last_rotated': CloudTrailParser.parse_datetime(user_data.get('access_key_1_last_rotated')),
+                        'last_used_date': CloudTrailParser.parse_datetime(user_data.get('access_key_1_last_used_date')),
+                        'last_used_region': user_data.get('access_key_1_last_used_region'),
+                        'last_used_service': user_data.get('access_key_1_last_used_service')
+                    },
+                    'access_key_2': {
+                        'active': user_data.get('access_key_2_active', False),
+                        'last_rotated': CloudTrailParser.parse_datetime(user_data.get('access_key_2_last_rotated')),
+                        'last_used_date': CloudTrailParser.parse_datetime(user_data.get('access_key_2_last_used_date')),
+                        'last_used_region': user_data.get('access_key_2_last_used_region'),
+                        'last_used_service': user_data.get('access_key_2_last_used_service')
+                    }
+                },
+                'certificates': {
+                    'cert_1': {
+                        'active': user_data.get('cert_1_active', False),
+                        'last_rotated': CloudTrailParser.parse_datetime(user_data.get('cert_1_last_rotated'))
+                    },
+                    'cert_2': {
+                        'active': user_data.get('cert_2_active', False),
+                        'last_rotated': CloudTrailParser.parse_datetime(user_data.get('cert_2_last_rotated'))
+                    }
+                }
+            }
+            
+            parsed_report['users'].append(parsed_user)
+        
+        return parsed_report 
